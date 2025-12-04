@@ -20,13 +20,14 @@ ENV TZ=Asia/Shanghai
 RUN cp /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # 删除默认配置
-RUN rm -rf /etc/nginx/conf.d/default.conf
+RUN rm -rf /etc/nginx/conf.d/*
 
 # 复制主配置文件
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# 复制站点配置
-COPY conf.d/ /etc/nginx/conf.d/
+# 不复制 conf.d 配置，由 docker-compose volumes 挂载
+# 开发环境: 挂载 default.conf
+# 生产环境: 挂载 aliyun.conf
 
 # 创建 SSL 证书目录（生产环境使用）
 RUN mkdir -p /etc/nginx/ssl

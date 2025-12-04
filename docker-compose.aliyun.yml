@@ -77,7 +77,7 @@ services:
     ports:
       - "80:80"
     volumes:
-      # 使用阿里云专用配置
+      # 阿里云生产环境配置
       - ./nginx/conf.d/aliyun.conf:/etc/nginx/conf.d/default.conf:ro
       - ${LOG_DIR:-./logs}/nginx:/var/log/nginx
     depends_on:
