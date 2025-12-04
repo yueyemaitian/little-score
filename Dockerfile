@@ -14,6 +14,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
+# 配置阿里云镜像源（加速国内下载）
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list 2>/dev/null || true
+
 # 安装系统依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
@@ -26,8 +30,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 复制依赖文件
 COPY requirements.txt .
 
-# 安装 Python 依赖
-RUN pip install --no-cache-dir -r requirements.txt
+# 配置 pip 阿里云镜像源并安装依赖
+RUN pip install --no-cache-dir -i https://mirrors.aliyun.com/pypi/simple/ -r requirements.txt
 
 # 创建非 root 用户
 RUN groupadd -r appgroup && useradd -r -g appgroup appuser

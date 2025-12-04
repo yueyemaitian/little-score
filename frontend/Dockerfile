@@ -4,15 +4,21 @@
 # ===========================================
 
 # =================== 开发阶段 ===================
-FROM node:24-alpine AS development
+FROM node:22-alpine AS development
 
 LABEL maintainer="Little Score Team"
 LABEL description="Frontend development server for Little Score"
 
 WORKDIR /app
 
+# 配置阿里云 Alpine 镜像源
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+
 # 安装基础工具
 RUN apk add --no-cache curl
+
+# 配置 npm 阿里云镜像源
+RUN npm config set registry https://registry.npmmirror.com
 
 # 复制 package 文件
 COPY package*.json ./
@@ -37,9 +43,15 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
 # =================== 构建阶段 ===================
-FROM node:24-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
+
+# 配置阿里云 Alpine 镜像源
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+
+# 配置 npm 阿里云镜像源
+RUN npm config set registry https://registry.npmmirror.com
 
 # 复制 package 文件
 COPY package*.json ./
@@ -58,6 +70,9 @@ FROM nginx:alpine AS production
 
 LABEL maintainer="Little Score Team"
 LABEL description="Frontend production server for Little Score"
+
+# 配置阿里云 Alpine 镜像源
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
 
 # 安装 curl 用于健康检查
 RUN apk add --no-cache curl

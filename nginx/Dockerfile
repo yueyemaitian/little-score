@@ -6,6 +6,9 @@ FROM nginx:alpine
 LABEL maintainer="Little Score Team"
 LABEL description="Nginx reverse proxy for Little Score"
 
+# 配置阿里云 Alpine 镜像源
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
+
 # 安装工具
 RUN apk add --no-cache \
     curl \
