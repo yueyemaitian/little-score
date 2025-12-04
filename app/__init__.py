@@ -1,0 +1,5 @@
+"""
+Little Score backend package.
+"""
+
+

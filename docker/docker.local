@@ -1,0 +1,21 @@
+docker run -d -p 3306:3306 \
+    --name mysql950 \
+    -e MYSQL_ROOT_PASSWORD=root@7225 \
+    -e MYSQL_DATABASE=student_points_db \
+    -e MYSQL_USER=app-points \
+    -e MYSQL_PASSWORD=points@7225 \
+    -e MYSQL_INNODB_BUFFER_POOL_SIZE=256m \
+    -e MYSQL_MAX_CONNECTIONS=200 \
+    -v /Users/fanhua/develop/datas/mysql_data:/var/lib/mysql \
+    mysql:9.5.0
+
+
+
+# docker restart <container_name_or_id>
+docker restart mysql950
+# docker stop <container_name_or_id>
+docker stop mysql950
+
+#mysql -h 127.0.0.1 -P 3306 -u root -D MYSQL_DATABASE -p 
+mysql -h 127.0.0.1 -P 3306 -u app-points -D student_points_db -e "SHOW DATABASES;" -p
+

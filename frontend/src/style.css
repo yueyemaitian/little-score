@@ -1,0 +1,44 @@
+/* 基础样式重置 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: #f7f8fa;
+}
+
+#app {
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* 通用页面容器，保证与底部导航宽度一致 */
+.page-container {
+  min-height: 100vh;
+  width: 100%;
+  background: #f7f8fa;
+  padding-bottom: calc(80px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 1024px) {
+  .page-container {
+    max-width: 640px;
+    margin: 0 auto;
+    padding-bottom: 100px;
+  }
+}

@@ -1,0 +1,105 @@
+# 生产环境配置
+# 特点：优化构建、多 worker、自动重启、网络隔离
+
+# 通用日志配置
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "100m"
+    max-file: "12"
+
+services:
+  db:
+    image: mysql:9.5.0
+    container_name: little-score-db-prod
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      # 数据库数据映射
+      - ${MYSQL_DATA_DIR:-./data/mysql}:/var/lib/mysql
+      # 数据库日志映射
+      - ${LOG_DIR:-./logs}/mysql:/var/log/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app-network
+    logging: *default-logging
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: little-score-backend-prod
+    environment:
+      SQLALCHEMY_DATABASE_URI: mysql+aiomysql://${MYSQL_USER}:${MYSQL_PASSWORD}@db:3306/${MYSQL_DATABASE}
+      SECRET_KEY: ${SECRET_KEY}
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      # 后端日志映射
+      - ${LOG_DIR:-./logs}/backend:/app/logs
+    restart: unless-stopped
+    networks:
+      - app-network
+    logging: *default-logging
+    command: >
+      sh -c "
+        mkdir -p /app/logs &&
+        python3 -m alembic upgrade head &&
+        python3 -m app.db.init_db &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 2>&1 | tee /app/logs/uvicorn.log
+      "
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production  # 使用生产阶段（nginx 静态服务）
+    container_name: little-score-frontend-prod
+    volumes:
+      # 前端静态文件日志（nginx）
+      - ${LOG_DIR:-./logs}/frontend:/var/log/nginx
+    restart: unless-stopped
+    networks:
+      - app-network
+    logging: *default-logging
+
+  nginx:
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    container_name: little-score-nginx-prod
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # 配置文件映射
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      # SSL 证书目录
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      # Nginx 日志映射
+      - ${LOG_DIR:-./logs}/nginx:/var/log/nginx
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+    networks:
+      - app-network
+    logging: *default-logging
+
+# 不使用 Docker 命名卷
+# 数据目录: MYSQL_DATA_DIR (默认 ./data/mysql)
+# 日志目录: LOG_DIR (默认 ./logs)
+
+networks:
+  app-network:
+    driver: bridge
