@@ -51,13 +51,45 @@ async def get_score_increases(
     """获取积分增加记录"""
     # 验证学生属于当前用户
     from app.crud import student as student_crud
+    from app.crud import project as project_crud
+    from app.crud import task as task_crud
 
     student = await student_crud.get_student_by_id(db, student_id, current_user.id)
     if not student:
         raise HTTPException(status_code=404, detail="学生不存在")
 
     increases = await crud.get_score_increases(db, student_id, limit=limit)
-    return increases
+    
+    # 获取项目名称和评分等级
+    result = []
+    project_cache = {}  # 缓存项目，避免重复查询
+    task_cache = {}  # 缓存任务，避免重复查询
+    
+    for increase in increases:
+        increase_dict = ScoreIncreaseRead.model_validate(increase).model_dump()
+        
+        # 获取一级项目名称
+        if increase.project_level1_id not in project_cache:
+            project1 = await project_crud.get_project_by_id(db, increase.project_level1_id, current_user.id)
+            project_cache[increase.project_level1_id] = project1.name if project1 else None
+        increase_dict["project_level1_name"] = project_cache[increase.project_level1_id]
+        
+        # 获取二级项目名称
+        if increase.project_level2_id:
+            if increase.project_level2_id not in project_cache:
+                project2 = await project_crud.get_project_by_id(db, increase.project_level2_id, current_user.id)
+                project_cache[increase.project_level2_id] = project2.name if project2 else None
+            increase_dict["project_level2_name"] = project_cache[increase.project_level2_id]
+        
+        # 获取任务的评分等级
+        if increase.task_id not in task_cache:
+            task = await task_crud.get_task_by_id(db, increase.task_id, student_id)
+            task_cache[increase.task_id] = task.rating if task else None
+        increase_dict["rating"] = task_cache[increase.task_id]
+        
+        result.append(ScoreIncreaseRead(**increase_dict))
+    
+    return result
 
 
 @router.get("/exchanges", response_model=list[ScoreExchangeRead])
@@ -76,7 +108,25 @@ async def get_score_exchanges(
         raise HTTPException(status_code=404, detail="学生不存在")
 
     exchanges = await crud.get_score_exchanges(db, student_id, limit=limit)
-    return exchanges
+    
+    # 获取奖励名称
+    result = []
+    reward_cache = {}  # 缓存奖励选项，避免重复查询
+    
+    for exchange in exchanges:
+        exchange_dict = ScoreExchangeRead.model_validate(exchange).model_dump()
+        
+        # 从缓存或数据库获取奖励名称
+        if exchange.reward_option_id not in reward_cache:
+            reward_option = await crud.get_reward_exchange_option_by_id(
+                db, exchange.reward_option_id, current_user.id
+            )
+            reward_cache[exchange.reward_option_id] = reward_option.name if reward_option else None
+        exchange_dict["reward_name"] = reward_cache[exchange.reward_option_id]
+        
+        result.append(ScoreExchangeRead(**exchange_dict))
+    
+    return result
 
 
 @router.post("/exchanges", response_model=ScoreExchangeRead, status_code=201)

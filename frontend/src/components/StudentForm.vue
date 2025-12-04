@@ -74,9 +74,12 @@
     </van-popup>
 
     <!-- 日期选择器 -->
-    <van-popup v-model:show="showDatePicker" position="bottom">
+    <van-popup v-model:show="showDatePicker" position="bottom" round>
       <van-date-picker
         v-model="currentDate"
+        title="选择出生日期"
+        :min-date="new Date(1990, 0, 1)"
+        :max-date="new Date()"
         @confirm="onDateConfirm"
         @cancel="showDatePicker = false"
       />
@@ -94,9 +97,12 @@
     </van-popup>
 
     <!-- 入学日期选择器 -->
-    <van-popup v-model:show="showEnrollDatePicker" position="bottom">
+    <van-popup v-model:show="showEnrollDatePicker" position="bottom" round>
       <van-date-picker
         v-model="currentEnrollDate"
+        title="选择入学时间"
+        :min-date="new Date(2000, 0, 1)"
+        :max-date="new Date()"
         @confirm="onEnrollDateConfirm"
         @cancel="showEnrollDatePicker = false"
       />
@@ -320,15 +326,31 @@ onMounted(() => {
   }
 }
 
-/* 确保 picker 支持鼠标滚轮滚动和双击确认 */
+/* 确保 picker 支持鼠标滚轮滚动 */
 :deep(.van-picker-column) {
   cursor: pointer;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
+}
+
+:deep(.van-picker-column__wrapper) {
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* 支持双击确认 */
 :deep(.van-picker-column__item) {
   cursor: pointer;
   user-select: none;
+}
+
+/* 确保 popup 内容可以正常交互 */
+:deep(.van-popup) {
+  touch-action: pan-y;
+}
+
+:deep(.van-date-picker) {
+  touch-action: pan-y;
 }
 </style>
 

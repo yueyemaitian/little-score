@@ -16,6 +16,9 @@ class ScoreIncreaseRead(BaseModel):
     task_id: int
     project_level1_id: int
     project_level2_id: int | None
+    project_level1_name: str | None = None  # 一级项目名称
+    project_level2_name: str | None = None  # 二级项目名称
+    rating: str | None = None  # 评分等级
     points: int
     created_at: datetime
 
@@ -57,6 +60,7 @@ class ScoreExchangeRead(BaseModel):
     id: int
     student_id: int
     reward_option_id: int
+    reward_name: str | None = None  # 奖励名称
     cost_points: int
     created_at: datetime
 

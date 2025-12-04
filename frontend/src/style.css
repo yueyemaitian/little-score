@@ -42,3 +42,23 @@ body {
     padding-bottom: 100px;
   }
 }
+
+/* 确保 Vant picker 组件可以正常滚动 */
+.van-picker-column {
+  touch-action: pan-y !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+.van-picker-column__wrapper {
+  touch-action: pan-y !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* 确保 popup 不阻止触摸事件 */
+.van-overlay {
+  touch-action: none;
+}
+
+.van-popup {
+  touch-action: pan-y;
+}

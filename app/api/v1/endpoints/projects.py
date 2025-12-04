@@ -21,7 +21,24 @@ async def get_projects(
 ):
     """获取项目列表"""
     projects = await crud.get_projects_by_user(db, current_user.id, level=level, parent_id=parent_id)
-    return projects
+    
+    # 如果是二级项目，获取父项目名称
+    result = []
+    parent_cache = {}  # 缓存父项目，避免重复查询
+    
+    for project in projects:
+        project_dict = ProjectRead.model_validate(project).model_dump()
+        
+        if project.parent_id:
+            # 从缓存或数据库获取父项目名称
+            if project.parent_id not in parent_cache:
+                parent = await crud.get_project_by_id(db, project.parent_id, current_user.id)
+                parent_cache[project.parent_id] = parent.name if parent else None
+            project_dict["parent_name"] = parent_cache[project.parent_id]
+        
+        result.append(ProjectRead(**project_dict))
+    
+    return result
 
 
 @router.post("/", response_model=ProjectRead, status_code=201)

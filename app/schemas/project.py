@@ -83,6 +83,7 @@ class ProjectUpdate(BaseModel):
 class ProjectRead(ProjectBase):
     id: int
     user_id: int
+    parent_name: str | None = None  # 父项目名称（二级项目时返回）
     created_at: datetime
     updated_at: datetime
 

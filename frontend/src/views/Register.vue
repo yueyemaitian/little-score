@@ -50,7 +50,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { showToast } from 'vant'
+import { showSuccessToast, showFailToast } from 'vant'
 import { useAuthStore } from '../stores/auth'
 import { extractErrorMessage } from '../utils/errorHandler'
 
@@ -97,11 +97,12 @@ const onSubmit = async () => {
   loading.value = true
   try {
     await authStore.register(form.value.email, form.value.password)
-    showToast.success('注册成功，请登录')
+    showSuccessToast('注册成功，请登录')
     router.push('/login')
   } catch (error) {
+    console.error('注册失败:', error)
     const message = extractErrorMessage(error)
-    showToast.fail(message)
+    showFailToast(message || '注册失败')
   } finally {
     loading.value = false
   }

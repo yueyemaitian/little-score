@@ -32,7 +32,8 @@
             <van-cell
               v-for="item in increases"
               :key="item.id"
-              :title="`+${item.points} 积分`"
+              :title="getIncreaseTitle(item)"
+              :value="`+${item.points} 积分`"
               :label="formatLocalDateTime(item.created_at)"
             />
           </van-cell-group>
@@ -52,7 +53,8 @@
             <van-cell
               v-for="item in exchanges"
               :key="item.id"
-              :title="`-${item.cost_points} 积分`"
+              :title="item.reward_name || '未知奖励'"
+              :value="`-${item.cost_points} 积分`"
               :label="formatLocalDateTime(item.created_at)"
             />
           </van-cell-group>
@@ -288,6 +290,27 @@ const onExchangeSubmit = async () => {
   } finally {
     exchanging.value = false
   }
+}
+
+// 获取积分增加记录的标题（项目名称 + 评分等级）
+const getIncreaseTitle = (item) => {
+  const parts = []
+  
+  // 项目名称
+  if (item.project_level1_name) {
+    if (item.project_level2_name) {
+      parts.push(`${item.project_level1_name} > ${item.project_level2_name}`)
+    } else {
+      parts.push(item.project_level1_name)
+    }
+  }
+  
+  // 评分等级
+  if (item.rating) {
+    parts.push(`评分: ${item.rating}`)
+  }
+  
+  return parts.length > 0 ? parts.join(' | ') : '任务奖励'
 }
 
 onMounted(async () => {

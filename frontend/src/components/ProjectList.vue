@@ -13,7 +13,7 @@
         <van-cell
           v-for="project in projects"
           :key="project.id"
-          :title="project.name"
+          :title="getProjectTitle(project)"
           :label="project.description"
           is-link
           @click="editProject(project)"
@@ -108,6 +108,14 @@ const handleProjectSuccess = () => {
   showProjectForm.value = false
   editingProject.value = null
   fetchProjects()
+}
+
+// 获取项目标题（二级项目显示：父项目名称 > 项目名称）
+const getProjectTitle = (project) => {
+  if (project.parent_name) {
+    return `${project.parent_name} > ${project.name}`
+  }
+  return project.name
 }
 
 watch(() => props.level, () => {
