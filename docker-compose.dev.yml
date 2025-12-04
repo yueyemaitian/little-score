@@ -10,7 +10,7 @@ x-logging: &default-logging
 
 services:
   db:
-    image: mysql:8.0
+    image: mysql:9.5.0
     container_name: little-score-db-dev
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
