@@ -4,7 +4,7 @@
 # ===========================================
 
 # =================== 开发阶段 ===================
-FROM node:alpine AS development
+FROM node:24-alpine AS development
 
 LABEL maintainer="Little Score Team"
 LABEL description="Frontend development server for Little Score"
@@ -37,7 +37,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
 # =================== 构建阶段 ===================
-FROM node:alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
