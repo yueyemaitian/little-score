@@ -176,7 +176,7 @@ mkdir -p /opt/little-score/nginx/ssl
 apt install certbot -y
 
 # 获取证书（先停止 nginx）
-docker-compose -f docker-compose.prod.yml stop nginx
+docker-compose -f docker-compose.aliyun.yml stop nginx
 certbot certonly --standalone -d 你的域名
 
 # 复制证书
@@ -190,13 +190,13 @@ cp /etc/letsencrypt/live/你的域名/privkey.pem /opt/little-score/nginx/ssl/
 cd /opt/little-score
 
 # 构建并启动所有服务
-docker-compose -f docker-compose.prod.yml up -d --build
+docker-compose -f docker-compose.aliyun.yml up -d --build
 
 # 查看服务状态
-docker-compose -f docker-compose.prod.yml ps
+docker-compose -f docker-compose.aliyun.yml ps
 
 # 查看日志
-docker-compose -f docker-compose.prod.yml logs -f
+docker-compose -f docker-compose.aliyun.yml logs -f
 ```
 
 ## 四、域名配置
@@ -226,21 +226,21 @@ nslookup 你的域名
 cd /opt/little-score
 
 # 查看服务状态
-docker-compose -f docker-compose.prod.yml ps
+docker-compose -f docker-compose.aliyun.yml ps
 
 # 查看日志
-docker-compose -f docker-compose.prod.yml logs -f backend
-docker-compose -f docker-compose.prod.yml logs -f nginx
+docker-compose -f docker-compose.aliyun.yml logs -f backend
+docker-compose -f docker-compose.aliyun.yml logs -f nginx
 
 # 重启服务
-docker-compose -f docker-compose.prod.yml restart
+docker-compose -f docker-compose.aliyun.yml restart
 
 # 停止服务
-docker-compose -f docker-compose.prod.yml down
+docker-compose -f docker-compose.aliyun.yml down
 
 # 更新代码后重新部署
 git pull
-docker-compose -f docker-compose.prod.yml up -d --build
+docker-compose -f docker-compose.aliyun.yml up -d --build
 ```
 
 ### 5.2 数据库备份
@@ -280,7 +280,7 @@ cat > /opt/little-score/renew-ssl.sh << 'EOF'
 cd /opt/little-score
 
 # 停止 nginx
-docker-compose -f docker-compose.prod.yml stop nginx
+docker-compose -f docker-compose.aliyun.yml stop nginx
 
 # 续期证书
 certbot renew
@@ -290,7 +290,7 @@ cp /etc/letsencrypt/live/你的域名/fullchain.pem /opt/little-score/nginx/ssl/
 cp /etc/letsencrypt/live/你的域名/privkey.pem /opt/little-score/nginx/ssl/
 
 # 启动 nginx
-docker-compose -f docker-compose.prod.yml start nginx
+docker-compose -f docker-compose.aliyun.yml start nginx
 EOF
 
 chmod +x /opt/little-score/renew-ssl.sh
@@ -318,8 +318,8 @@ du -sh /opt/little-score/logs/*
 
 ```bash
 # 查看详细日志
-docker-compose -f docker-compose.prod.yml logs backend
-docker-compose -f docker-compose.prod.yml logs db
+docker-compose -f docker-compose.aliyun.yml logs backend
+docker-compose -f docker-compose.aliyun.yml logs db
 
 # 检查端口占用
 netstat -tlnp | grep -E '80|443|8000|3306'
@@ -340,10 +340,10 @@ docker network inspect little-score_app-network
 
 ```bash
 # 检查后端服务是否正常
-docker-compose -f docker-compose.prod.yml logs backend
+docker-compose -f docker-compose.aliyun.yml logs backend
 
 # 检查容器网络连通性
-docker exec little-score-nginx-prod ping backend
+docker exec little-score-nginx-aliyun ping backend
 ```
 
 ## 七、安全建议
@@ -417,11 +417,11 @@ EOF
 fi
 
 # 6. 启动服务
-docker-compose -f docker-compose.prod.yml up -d --build
+docker-compose -f docker-compose.aliyun.yml up -d --build
 
 echo "=== 部署完成 ==="
 echo "请访问: http://$(curl -s ifconfig.me)"
-docker-compose -f docker-compose.prod.yml ps
+docker-compose -f docker-compose.aliyun.yml ps
 ```
 
 保存为 `deploy.sh` 并执行：
