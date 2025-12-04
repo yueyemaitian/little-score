@@ -57,9 +57,14 @@ services:
     command: >
       sh -c "
         mkdir -p /app/logs &&
+        exec > >(tee -a /app/logs/startup.log) 2>&1 &&
+        echo '========== 启动时间:' $$(date '+%Y-%m-%d %H:%M:%S') '==========' &&
+        echo '>>> 执行数据库迁移...' &&
         python3 -m alembic upgrade head &&
+        echo '>>> 初始化数据库...' &&
         python3 -m app.db.init_db &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload 2>&1 | tee /app/logs/uvicorn.log
+        echo '>>> 启动应用服务...' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload 2>&1 | tee -a /app/logs/uvicorn.log
       "
     networks:
       - app-network
