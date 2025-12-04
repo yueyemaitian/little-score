@@ -52,17 +52,7 @@ services:
     networks:
       - app-network
     logging: *default-logging
-    command: >
-      sh -c '
-        mkdir -p /app/logs &&
-        echo "========== 启动时间: $$(date +%Y-%m-%d\ %H:%M:%S) ==========" >> /app/logs/startup.log &&
-        echo ">>> 执行数据库迁移..." >> /app/logs/startup.log &&
-        python3 -m alembic upgrade head 2>&1 | tee -a /app/logs/startup.log &&
-        echo ">>> 初始化数据库..." >> /app/logs/startup.log &&
-        python3 -m app.db.init_db 2>&1 | tee -a /app/logs/startup.log &&
-        echo ">>> 启动应用服务..." >> /app/logs/startup.log &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 2>&1 | tee -a /app/logs/uvicorn.log
-      '
+    command: ["/app/docker-entrypoint.sh"]
 
   frontend:
     build:
@@ -105,7 +95,9 @@ networks:
 # ===========================================
 # 部署说明:
 # 1. 创建 .env 文件（参考 .env.aliyun.example）
-# 2. 创建数据目录: mkdir -p data/mysql logs/{backend,frontend,nginx,mysql}
+# 2. 创建数据目录并设置权限:
+#    mkdir -p data/mysql logs/{backend,frontend,nginx,mysql}
+#    chmod 777 logs/backend
 # 3. 启动: docker-compose -f docker-compose.aliyun.yml up -d --build
 # 4. 访问: http://<ECS公网IP>
 # ===========================================

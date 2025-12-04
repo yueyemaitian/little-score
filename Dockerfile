@@ -42,6 +42,10 @@ RUN mkdir -p /app/logs && chown -R appuser:appgroup /app/logs
 # 复制应用代码
 COPY --chown=appuser:appgroup . .
 
+# 复制并设置入口脚本
+COPY --chown=appuser:appgroup docker-entrypoint.sh /app/
+RUN chmod +x /app/docker-entrypoint.sh
+
 # 切换到非 root 用户
 USER appuser
 
