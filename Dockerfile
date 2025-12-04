@@ -1,7 +1,7 @@
 # ===========================================
 # 后端 Dockerfile (FastAPI + Python)
 # ===========================================
-FROM python:3.13-slim
+FROM python:3.10-slim
 
 LABEL maintainer="Little Score Team"
 LABEL description="Backend API service for Little Score"
