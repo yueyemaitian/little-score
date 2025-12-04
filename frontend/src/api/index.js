@@ -2,9 +2,9 @@ import axios from 'axios'
 import { useAuthStore } from '../stores/auth'
 
 const api = axios.create({
-  // 生产环境使用相对路径（通过 nginx 代理）
-  // 开发环境使用 VITE_API_BASE_URL 或 localhost
-  baseURL: import.meta.env.VITE_API_BASE_URL || (import.meta.env.PROD ? '/api/v1' : 'http://localhost:8000/api/v1'),
+  // 优先使用环境变量，否则使用相对路径（通过 nginx 代理）
+  // 开发环境在 docker-compose.dev.yml 中设置 VITE_API_BASE_URL
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
   timeout: 10000
 })
 
