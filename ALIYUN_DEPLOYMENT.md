@@ -136,84 +136,22 @@ chmod -R 755 /opt/little-score/logs
 
 ### 3.5 配置 Nginx（域名和 SSL）
 
-#### 修改 Nginx 配置
+Nginx 配置文件位于 `nginx/conf.d/aliyun.conf`，已包含 HTTP 和 HTTPS 两种模式。
 
-编辑 `nginx/conf.d/default.conf`：
+#### 启用 HTTPS（可选）
+
+如需启用 HTTPS，编辑 `nginx/conf.d/aliyun.conf`：
+
+1. 将所有 `your-domain.com` 替换为你的实际域名
+2. 注释掉 "HTTP 模式" 部分（约 1-60 行）
+3. 取消 "HTTPS 模式" 部分的注释（约 70-145 行）
 
 ```bash
-cat > nginx/conf.d/default.conf << 'EOF'
-# HTTP 重定向到 HTTPS
-server {
-    listen 80;
-    server_name 你的域名;
+# 替换域名（将 your-domain.com 替换为实际域名）
+sed -i 's/your-domain.com/你的实际域名/g' nginx/conf.d/aliyun.conf
 
-    # 健康检查端点（不重定向）
-    location /health {
-        access_log off;
-        return 200 'OK';
-        add_header Content-Type text/plain;
-    }
-
-    # 其他请求重定向到 HTTPS
-    location / {
-        return 301 https://$host$request_uri;
-    }
-}
-
-# HTTPS 主服务
-server {
-    listen 443 ssl http2;
-    server_name 你的域名;
-
-    # SSL 证书配置
-    ssl_certificate /etc/nginx/ssl/fullchain.pem;
-    ssl_certificate_key /etc/nginx/ssl/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384;
-    ssl_prefer_server_ciphers on;
-    ssl_session_cache shared:SSL:10m;
-
-    client_max_body_size 10M;
-
-    # 健康检查端点
-    location /health {
-        access_log off;
-        return 200 'OK';
-        add_header Content-Type text/plain;
-    }
-
-    # API 路由 - 代理到后端
-    location /api/ {
-        proxy_pass http://backend:8000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-
-        # 超时设置
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
-    }
-
-    # 前端路由 - 代理到前端服务
-    location / {
-        proxy_pass http://frontend:80;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-EOF
+# 然后手动编辑文件，调整注释
+vim nginx/conf.d/aliyun.conf
 ```
 
 #### 配置 SSL 证书
