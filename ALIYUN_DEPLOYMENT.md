@@ -138,36 +138,19 @@ chmod -R 755 /opt/little-score/logs
 
 Nginx 配置文件位于 `nginx/conf.d/aliyun.conf`，已包含 HTTP 和 HTTPS 两种模式。
 
-#### 启用 HTTPS（可选）
+---
 
-如需启用 HTTPS，编辑 `nginx/conf.d/aliyun.conf`：
+## 3.5.1 SSL/HTTPS 完整配置指南
 
-1. 将所有 `your-domain.com` 替换为你的实际域名
-2. 注释掉 "HTTP 模式" 部分（约 1-60 行）
-3. 取消 "HTTPS 模式" 部分的注释（约 70-145 行）
+### 步骤一：申请 SSL 证书
 
-```bash
-# 替换域名（将 your-domain.com 替换为实际域名）
-sed -i 's/your-domain.com/你的实际域名/g' nginx/conf.d/aliyun.conf
+**方式一：阿里云免费证书（推荐）**
 
-# 然后手动编辑文件，调整注释
-vim nginx/conf.d/aliyun.conf
-```
-
-#### 配置 SSL 证书
-
-**方式一：阿里云免费证书**
-
-1. 登录阿里云控制台 -> SSL 证书服务
-2. 申请免费证书（每年 20 个免费 DV 证书）
-3. 下载 Nginx 格式证书
-4. 上传到服务器：
-
-```bash
-# 将证书文件放到 ssl 目录
-mkdir -p /opt/little-score/nginx/ssl
-# 上传 fullchain.pem 和 privkey.pem 到此目录
-```
+1. 登录 [阿里云 SSL 证书控制台](https://yundunnext.console.aliyun.com/?p=cas)
+2. 点击「免费证书」→「立即购买」（每年 20 个免费 DV 证书）
+3. 填写域名信息，选择 DNS 验证
+4. 等待审核（通常几分钟）
+5. 下载证书，选择「Nginx」格式
 
 **方式二：Let's Encrypt 免费证书**
 
@@ -176,13 +159,131 @@ mkdir -p /opt/little-score/nginx/ssl
 apt install certbot -y
 
 # 获取证书（先停止 nginx）
-docker-compose -f docker-compose.aliyun.yml stop nginx
+docker-compose -f docker-compose.aliyun.yml --env-file .env.aliyun stop nginx
 certbot certonly --standalone -d 你的域名
 
-# 复制证书
+# 证书位置：/etc/letsencrypt/live/你的域名/
+```
+
+### 步骤二：上传证书到服务器
+
+```bash
+# 创建 SSL 证书目录
+mkdir -p /opt/little-score/nginx/ssl
+
+# 方式一：阿里云证书 - 上传下载的证书文件
+# 将下载的 xxx.pem 重命名为 fullchain.pem
+# 将下载的 xxx.key 重命名为 privkey.pem
+scp fullchain.pem root@<ECS_IP>:/opt/little-score/nginx/ssl/
+scp privkey.pem root@<ECS_IP>:/opt/little-score/nginx/ssl/
+
+# 方式二：Let's Encrypt 证书 - 复制证书
 cp /etc/letsencrypt/live/你的域名/fullchain.pem /opt/little-score/nginx/ssl/
 cp /etc/letsencrypt/live/你的域名/privkey.pem /opt/little-score/nginx/ssl/
+
+# 设置证书权限
+chmod 600 /opt/little-score/nginx/ssl/*.pem
 ```
+
+### 步骤三：修改 Nginx 配置
+
+编辑 `nginx/conf.d/aliyun.conf`：
+
+```bash
+cd /opt/little-score
+vim nginx/conf.d/aliyun.conf
+```
+
+**修改内容：**
+
+1. 注释掉 "HTTP 模式" 部分（第 14-63 行）
+2. 取消 "HTTPS 模式" 部分的注释（第 76-149 行）
+3. 将所有 `your-domain.com` 替换为你的实际域名
+
+**快捷命令：**
+
+```bash
+# 替换域名（将 your-domain.com 替换为实际域名）
+sed -i 's/your-domain.com/你的实际域名/g' nginx/conf.d/aliyun.conf
+```
+
+### 步骤四：修改 docker-compose 配置
+
+编辑 `docker-compose.aliyun.yml`，确保 nginx 服务配置正确：
+
+```yaml
+nginx:
+  build:
+    context: ./nginx
+    dockerfile: Dockerfile
+  container_name: little-score-nginx
+  ports:
+    - "80:80"
+    - "443:443"   # 添加 HTTPS 端口
+  volumes:
+    - ./nginx/conf.d/aliyun.conf:/etc/nginx/conf.d/default.conf:ro
+    - ./nginx/ssl:/etc/nginx/ssl:ro   # 挂载证书目录
+    - ${LOG_DIR:-./logs}/nginx:/var/log/nginx
+```
+
+### 步骤五：更新 CORS 配置
+
+编辑 `.env.aliyun`，更新为 HTTPS：
+
+```bash
+BACKEND_CORS_ORIGINS=https://你的域名
+```
+
+### 步骤六：阿里云安全组开放 443 端口
+
+1. 登录阿里云 ECS 控制台
+2. 进入实例 → 安全组 → 配置规则
+3. 入方向添加规则：
+   - 端口范围：443/443
+   - 授权对象：0.0.0.0/0
+
+### 步骤七：重启服务
+
+```bash
+cd /opt/little-score
+
+# 停止服务
+docker-compose -f docker-compose.aliyun.yml --env-file .env.aliyun down
+
+# 重新构建并启动
+docker-compose -f docker-compose.aliyun.yml --env-file .env.aliyun up -d --build
+
+# 验证 HTTPS
+curl -I https://你的域名
+```
+
+### 步骤八：验证配置
+
+```bash
+# 检查证书是否正确加载
+docker exec little-score-nginx nginx -t
+
+# 检查 HTTPS 是否生效
+curl -I https://你的域名
+
+# 检查 HTTP 是否自动跳转到 HTTPS
+curl -I http://你的域名
+```
+
+### 常见问题
+
+**Q: 证书不受信任？**
+- 确保上传的是完整的证书链（fullchain.pem），不是只有服务器证书
+
+**Q: 443 端口无法访问？**
+- 检查阿里云安全组是否开放 443 端口
+- 检查 docker-compose.yml 是否映射了 443 端口
+
+**Q: 证书过期怎么办？**
+- 阿里云免费证书有效期 1 年，需要手动续期
+- Let's Encrypt 证书有效期 90 天，建议配置自动续期（见 5.3 节）
+
+---
 
 ### 3.6 启动服务
 
