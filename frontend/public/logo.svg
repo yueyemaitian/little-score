@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+  <!-- 背景圆形 -->
+  <circle cx="54" cy="54" r="50" fill="#4CAF50"/>
+  
+  <!-- 星星图案（代表积分/奖励） -->
+  <polygon 
+    points="54,18 62,42 88,42 67,58 75,82 54,66 33,82 41,58 20,42 46,42" 
+    fill="#FFD700"
+    stroke="#FFA000"
+    stroke-width="2"
+  />
+  
+  <!-- 中心积分符号 -->
+  <text 
+    x="54" 
+    y="62" 
+    font-family="Arial, sans-serif" 
+    font-size="24" 
+    font-weight="bold" 
+    fill="#FFFFFF" 
+    text-anchor="middle"
+  >+</text>
+</svg>
+
