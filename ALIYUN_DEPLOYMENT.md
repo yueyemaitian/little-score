@@ -115,6 +115,15 @@ BACKEND_CORS_ORIGINS=https://你的域名,http://你的域名
 # 数据目录
 MYSQL_DATA_DIR=/opt/little-score/data/mysql
 LOG_DIR=/opt/little-score/logs
+
+# AI 语音助手配置（可选，不配置则禁用语音助手功能）
+# 支持 DeepSeek、通义千问等 OpenAI 兼容 API
+AI_API_KEY=<你的 AI API 密钥>
+AI_API_BASE_URL=https://api.deepseek.com
+AI_MODEL=deepseek-chat
+# 或者使用通义千问:
+# AI_API_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+# AI_MODEL=qwen-turbo
 EOF
 ```
 

@@ -42,6 +42,10 @@ services:
       SQLALCHEMY_DATABASE_URI: mysql+aiomysql://${MYSQL_USER:-app_user}:${MYSQL_PASSWORD}@db:3306/${MYSQL_DATABASE:-little_score}
       SECRET_KEY: ${SECRET_KEY}
       BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS}
+      # AI 语音助手配置（可选）
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_API_BASE_URL: ${AI_API_BASE_URL:-https://api.deepseek.com}
+      AI_MODEL: ${AI_MODEL:-deepseek-chat}
       TZ: Asia/Shanghai
     depends_on:
       db:

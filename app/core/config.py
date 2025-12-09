@@ -1,6 +1,6 @@
 import json
 from functools import lru_cache
-from typing import List, Union
+from typing import List, Optional, Union
 
 from pydantic import AnyUrl, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -20,6 +20,11 @@ class Settings(BaseSettings):
 
     # 允许的前端跨域地址（支持 JSON 数组字符串或逗号分隔的字符串）
     BACKEND_CORS_ORIGINS: Union[List[AnyUrl], str] = []
+
+    # AI 大模型配置（支持 DeepSeek、Qwen 等 OpenAI 兼容 API）
+    AI_API_KEY: Optional[str] = None
+    AI_API_BASE_URL: str = "https://api.deepseek.com"  # 默认使用 DeepSeek
+    AI_MODEL: str = "deepseek-chat"  # 默认模型
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod

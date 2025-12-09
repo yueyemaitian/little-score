@@ -169,6 +169,10 @@ const props = defineProps({
   studentId: {
     type: Number,
     required: true
+  },
+  prefill: {
+    type: Object,
+    default: null
   }
 })
 
@@ -446,6 +450,7 @@ onMounted(async () => {
   await fetchPunishmentOptions()
   
   if (props.task) {
+    // 编辑现有任务
     form.value = {
       project_level1_id: props.task.project_level1_id,
       project_level2_id: props.task.project_level2_id,
@@ -459,6 +464,40 @@ onMounted(async () => {
     if (props.task.project_level1_id) {
       const projects = await projectsApi.getList({ level: 2, parent_id: props.task.project_level1_id })
       level2Projects.value = projects
+    }
+  } else if (props.prefill) {
+    // 从语音助手预填数据
+    const prefillData = props.prefill
+    
+    // 设置状态（通常是已完成）
+    if (prefillData.status) {
+      form.value.status = prefillData.status
+    }
+    
+    // 设置一级项目
+    if (prefillData.project_level1_id) {
+      form.value.project_level1_id = prefillData.project_level1_id
+      // 加载二级项目
+      const projects = await projectsApi.getList({ level: 2, parent_id: prefillData.project_level1_id })
+      level2Projects.value = projects
+      
+      // 设置二级项目
+      if (prefillData.project_level2_id) {
+        form.value.project_level2_id = prefillData.project_level2_id
+      }
+    }
+    
+    // 设置评分
+    if (prefillData.rating) {
+      form.value.rating = prefillData.rating
+    }
+    
+    // 设置奖励类型和积分
+    if (prefillData.reward_type) {
+      form.value.reward_type = prefillData.reward_type
+    }
+    if (prefillData.reward_points) {
+      form.value.reward_points = prefillData.reward_points
     }
   }
 })

@@ -1,10 +1,13 @@
 <template>
   <router-view />
+  <!-- 语音助手组件 - 仅在登录后显示 -->
+  <VoiceAssistant v-if="authStore.isAuthenticated" />
 </template>
 
 <script setup>
 import { onMounted } from 'vue'
 import { useAuthStore } from './stores/auth'
+import VoiceAssistant from './components/VoiceAssistant.vue'
 
 const authStore = useAuthStore()
 

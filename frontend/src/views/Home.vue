@@ -1,6 +1,6 @@
 <template>
   <div class="page-container home-container">
-    <van-nav-bar title="学生积分管理" />
+    <van-nav-bar />
     
     <van-loading v-if="loading" vertical>加载中...</van-loading>
     
@@ -22,13 +22,19 @@
           <div class="student-section">
             <div class="section-title">积分汇总</div>
             <div class="summary-grid">
-              <div class="summary-item">
+              <div class="summary-item clickable" @click="handleAvailablePointsClick(studentDashboard.student.id)">
                 <div class="summary-label">可用积分</div>
-                <div class="summary-value highlight">{{ studentDashboard.score_summary.available_points }}</div>
+                <div class="summary-value highlight">
+                  {{ studentDashboard.score_summary.available_points }}
+                  <van-icon name="arrow" class="link-icon" />
+                </div>
               </div>
-              <div class="summary-item">
+              <div class="summary-item clickable" @click="handleExchangedPointsClick(studentDashboard.student.id)">
                 <div class="summary-label">已兑换积分</div>
-                <div class="summary-value">{{ studentDashboard.score_summary.exchanged_points }}</div>
+                <div class="summary-value">
+                  {{ studentDashboard.score_summary.exchanged_points }}
+                  <van-icon name="arrow" class="link-icon" />
+                </div>
               </div>
             </div>
           </div>
@@ -68,11 +74,13 @@
 
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { showFailToast } from 'vant'
 import { dashboardApi } from '../api/dashboard'
 import { useStudentsStore } from '../stores/students'
 import BottomNav from '../components/BottomNav.vue'
 
+const router = useRouter()
 const studentsStore = useStudentsStore()
 
 const loading = ref(true)
@@ -95,6 +103,30 @@ const fetchDashboard = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// 点击可用积分 - 跳转到新增兑换页面
+const handleAvailablePointsClick = (studentId) => {
+  studentsStore.setCurrentStudent(studentId)
+  router.push({
+    path: '/scores',
+    query: {
+      action: 'exchange',
+      student_id: studentId
+    }
+  })
+}
+
+// 点击已兑换积分 - 跳转到兑换记录列表页
+const handleExchangedPointsClick = (studentId) => {
+  studentsStore.setCurrentStudent(studentId)
+  router.push({
+    path: '/scores',
+    query: {
+      tab: 'exchanges',
+      student_id: studentId
+    }
+  })
 }
 
 onMounted(() => {
@@ -184,6 +216,16 @@ onMounted(() => {
   padding: 12px;
 }
 
+.summary-item.clickable {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.summary-item.clickable:active {
+  background: #ebedf0;
+  transform: scale(0.98);
+}
+
 .summary-label {
   font-size: 13px;
   color: #646566;
@@ -194,10 +236,23 @@ onMounted(() => {
   font-size: 20px;
   font-weight: 600;
   color: #323233;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .summary-value.highlight {
   color: #1989fa;
+}
+
+.link-icon {
+  font-size: 14px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.summary-item.clickable:hover .link-icon {
+  opacity: 1;
 }
 
 .rating-list {

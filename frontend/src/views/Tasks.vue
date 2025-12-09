@@ -1,6 +1,6 @@
 <template>
   <div class="page-container tasks-container">
-    <van-nav-bar title="任务管理" />
+    <van-nav-bar />
     
     <!-- 学生选择 -->
     <van-cell-group inset style="margin: 12px;">
@@ -137,14 +137,15 @@
       <van-nav-bar
         :title="editingTask ? '编辑任务' : '新增任务'"
         left-arrow
-        @click-left="showTaskForm = false"
+        @click-left="handleCloseTaskForm"
       />
       <TaskForm
         v-if="showTaskForm"
         :task="editingTask"
         :student-id="currentStudentId"
+        :prefill="prefillData"
         @success="handleTaskSuccess"
-        @cancel="showTaskForm = false"
+        @cancel="handleCloseTaskForm"
       />
     </van-popup>
 
@@ -155,7 +156,8 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
-import { showFailToast, showSuccessToast } from 'vant'
+import { useRoute, useRouter } from 'vue-router'
+import { showFailToast, showSuccessToast, showToast } from 'vant'
 import { tasksApi } from '../api/tasks'
 import { projectsApi } from '../api/projects'
 import { useStudentsStore } from '../stores/students'
@@ -163,7 +165,12 @@ import { useEnumsStore } from '../stores/enums'
 import TaskForm from '../components/TaskForm.vue'
 import BottomNav from '../components/BottomNav.vue'
 
+const route = useRoute()
+const router = useRouter()
 const studentsStore = useStudentsStore()
+
+// 预填表单数据（从语音助手传递）
+const prefillData = ref(null)
 
 const loading = ref(false)
 const tasks = ref([])
@@ -418,7 +425,14 @@ const editTask = (task) => {
 const handleTaskSuccess = () => {
   showTaskForm.value = false
   editingTask.value = null
+  prefillData.value = null
   fetchTasks()
+}
+
+const handleCloseTaskForm = () => {
+  showTaskForm.value = false
+  editingTask.value = null
+  prefillData.value = null
 }
 
 const handleAddTask = () => {
@@ -430,6 +444,42 @@ const handleAddTask = () => {
   showTaskForm.value = true
 }
 
+// 处理预填数据和打开表单的函数
+const handlePrefillData = async () => {
+  // 处理 URL 参数中的 student_id（从语音助手跳转过来）
+  if (route.query.student_id) {
+    const studentId = parseInt(route.query.student_id)
+    const student = studentsStore.students.find(s => s.id === studentId)
+    if (student) {
+      currentStudentId.value = studentId
+      selectedStudentName.value = student.name
+      studentsStore.setCurrentStudent(studentId)
+    }
+  }
+  
+  // 检查是否有预填数据（从语音助手跳转）
+  if (route.query.action === 'add' && route.query.prefill) {
+    try {
+      prefillData.value = JSON.parse(decodeURIComponent(route.query.prefill))
+      // 确保已选择学生后再打开表单
+      if (currentStudentId.value) {
+        showTaskForm.value = true
+        showToast({
+          message: '已从语音助手预填表单，请确认信息',
+          position: 'top',
+          duration: 3000
+        })
+      } else {
+        showFailToast('请先选择学生')
+      }
+      // 清除 URL 参数，避免刷新页面重复打开
+      router.replace({ path: '/tasks' })
+    } catch (e) {
+      console.error('解析预填数据失败:', e)
+    }
+  }
+}
+
 watch(() => filters.value.project_level1_id, async (newVal) => {
   if (newVal) {
     const projects = await projectsApi.getList({ level: 2, parent_id: newVal })
@@ -439,14 +489,29 @@ watch(() => filters.value.project_level1_id, async (newVal) => {
   }
 })
 
+// 监听路由变化，处理预填数据（当用户在任务页面时，路由参数变化也能响应）
+watch(() => route.query, async (newQuery) => {
+  if (newQuery.action === 'add' && newQuery.prefill) {
+    await handlePrefillData()
+  }
+}, { deep: true })
+
 onMounted(async () => {
   await studentsStore.fetchStudents()
+  
+  // 初始化学生选择
   if (studentsStore.students.length > 0) {
-    currentStudentId.value = studentsStore.currentStudent.id
-    selectedStudentName.value = studentsStore.currentStudent.name
+    if (!currentStudentId.value) {
+      currentStudentId.value = studentsStore.currentStudent.id
+      selectedStudentName.value = studentsStore.currentStudent.name
+    }
   }
+  
   await fetchProjects()
   await fetchTasks()
+  
+  // 处理预填数据
+  await handlePrefillData()
 })
 </script>
 

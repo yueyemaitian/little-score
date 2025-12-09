@@ -1,6 +1,6 @@
 <template>
   <div class="page-container scores-container">
-    <van-nav-bar title="积分管理" />
+    <van-nav-bar />
     
     <!-- 学生选择 -->
     <van-cell-group inset style="margin: 12px;">
@@ -18,8 +18,18 @@
       <van-tab title="积分汇总">
         <div v-if="summary" class="summary-section">
           <van-cell-group inset style="margin: 12px;">
-            <van-cell title="可用积分" :value="`${summary.available_points} 分`" />
-            <van-cell title="已兑换积分" :value="`${summary.exchanged_points} 分`" />
+            <van-cell 
+              title="可用积分" 
+              :value="`${summary.available_points} 分`"
+              is-link
+              @click="handleAvailablePointsClick"
+            />
+            <van-cell 
+              title="已兑换积分" 
+              :value="`${summary.exchanged_points} 分`"
+              is-link
+              @click="handleExchangedPointsClick"
+            />
           </van-cell-group>
         </div>
       </van-tab>
@@ -129,13 +139,16 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { showFailToast, showSuccessToast } from 'vant'
+import { useRoute, useRouter } from 'vue-router'
+import { showFailToast, showSuccessToast, showToast } from 'vant'
 import { scoresApi } from '../api/scores'
 import { useStudentsStore } from '../stores/students'
 import BottomNav from '../components/BottomNav.vue'
 import { extractErrorMessage } from '../utils/errorHandler'
 import { formatLocalDateTime } from '../utils/date'
 
+const route = useRoute()
+const router = useRouter()
 const studentsStore = useStudentsStore()
 
 const currentStudentId = ref(null)
@@ -292,6 +305,21 @@ const onExchangeSubmit = async () => {
   }
 }
 
+// 点击可用积分 - 打开新增兑换表单
+const handleAvailablePointsClick = () => {
+  activeTab.value = 2  // 切换到兑换记录标签页
+  showExchangeForm.value = true
+}
+
+// 点击已兑换积分 - 跳转到兑换记录列表页
+const handleExchangedPointsClick = () => {
+  activeTab.value = 2  // 切换到兑换记录标签页
+  // 如果表单打开，先关闭
+  if (showExchangeForm.value) {
+    showExchangeForm.value = false
+  }
+}
+
 // 获取积分增加记录的标题（项目名称 + 评分等级）
 const getIncreaseTitle = (item) => {
   const parts = []
@@ -315,14 +343,70 @@ const getIncreaseTitle = (item) => {
 
 onMounted(async () => {
   await studentsStore.fetchStudents()
-  if (studentsStore.students.length > 0) {
+  
+  // 处理 URL 参数中的 student_id（从首页跳转过来）
+  if (route.query.student_id) {
+    const studentId = parseInt(route.query.student_id)
+    const student = studentsStore.students.find(s => s.id === studentId)
+    if (student) {
+      currentStudentId.value = studentId
+      selectedStudentName.value = student.name
+      studentsStore.setCurrentStudent(studentId)
+    }
+  } else if (studentsStore.students.length > 0) {
     currentStudentId.value = studentsStore.currentStudent.id
     selectedStudentName.value = studentsStore.currentStudent.name
   }
+  
   await fetchRewardOptions()
   await fetchSummary()
   await fetchIncreases()
   await fetchExchanges()
+  
+  // 检查是否有预填数据（从语音助手跳转）
+  if (route.query.action === 'exchange' && route.query.prefill) {
+    try {
+      const prefillData = JSON.parse(decodeURIComponent(route.query.prefill))
+      
+      // 切换到兑换记录标签页
+      activeTab.value = 2
+      
+      // 打开兑换表单并预填数据
+      if (prefillData.reward_option_id) {
+        exchangeForm.value.reward_option_id = prefillData.reward_option_id
+        showExchangeForm.value = true
+        showToast({
+          message: '已从语音助手预填兑换选项，请确认',
+          position: 'top',
+          duration: 3000
+        })
+      } else {
+        // 没有匹配到选项，仍打开表单让用户手动选择
+        showExchangeForm.value = true
+        showToast({
+          message: '请手动选择兑换奖励',
+          position: 'top',
+          duration: 3000
+        })
+      }
+      
+      // 清除 URL 参数，避免刷新页面重复打开
+      router.replace({ path: '/scores' })
+    } catch (e) {
+      console.error('解析预填数据失败:', e)
+    }
+  } else if (route.query.action === 'exchange') {
+    // 从首页点击可用积分跳转过来，直接打开兑换表单
+    activeTab.value = 2
+    showExchangeForm.value = true
+    // 清除 URL 参数
+    router.replace({ path: '/scores' })
+  } else if (route.query.tab === 'exchanges') {
+    // 从首页点击已兑换积分跳转过来，切换到兑换记录标签页
+    activeTab.value = 2
+    // 清除 URL 参数
+    router.replace({ path: '/scores' })
+  }
 })
 </script>
 
