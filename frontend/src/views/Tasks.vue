@@ -1,7 +1,5 @@
 <template>
   <div class="page-container tasks-container">
-    <van-nav-bar />
-    
     <!-- 学生选择 -->
     <van-cell-group inset style="margin: 12px;">
       <van-field

@@ -1,7 +1,5 @@
 <template>
   <div class="page-container home-container">
-    <van-nav-bar />
-    
     <van-loading v-if="loading" vertical>加载中...</van-loading>
     
     <div v-else class="home-content">

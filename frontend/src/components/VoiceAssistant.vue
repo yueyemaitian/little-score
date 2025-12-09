@@ -1,5 +1,5 @@
 <template>
-  <div class="voice-assistant">
+  <div class="voice-assistant" v-if="isSupported">
     <!-- 语音助手按钮 -->
     <van-floating-bubble
       v-model:offset="position"
@@ -148,21 +148,31 @@
 
           <!-- 录音按钮 -->
           <div class="record-button-area">
-            <van-button
-              :type="isListening ? 'danger' : 'primary'"
-              round
-              size="large"
-              :icon="isListening ? 'pause-circle-o' : 'audio'"
-              @click="toggleListening"
-              :disabled="isProcessing || isWeChat"
-              :loading="isProcessing"
+            <VoiceRecorder
+              ref="voiceRecorderRef"
+              :auto-process="false"
+              @result="handleVoiceResult"
+              @text="handleVoiceText"
+              @error="handleVoiceError"
             >
-              {{ isListening ? '停止录音' : '开始语音输入' }}
-            </van-button>
-            <div v-if="isWeChat" class="wechat-tip">
-              <van-icon name="info-o" />
-              <span>微信浏览器暂不支持语音识别，请使用上方文字输入</span>
-            </div>
+              <template #default="{ isListening: listening, isProcessing: processing, start, stop, supported }">
+                <van-button
+                  :type="listening ? 'danger' : 'primary'"
+                  round
+                  size="large"
+                  :icon="listening ? 'pause-circle-o' : 'audio'"
+                  @click="listening ? stop() : start()"
+                  :disabled="processing || !supported"
+                  :loading="processing"
+                >
+                  {{ listening ? '停止录音' : '开始语音输入' }}
+                </van-button>
+                <div v-if="!supported" class="unsupported-tip">
+                  <van-icon name="info-o" />
+                  <span>您的浏览器不支持语音识别，请使用上方文字输入</span>
+                </div>
+              </template>
+            </VoiceRecorder>
           </div>
 
           <!-- 使用提示 -->
@@ -178,11 +188,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showFailToast, showSuccessToast } from 'vant'
 import { aiApi } from '../api/ai'
 import { useStudentsStore } from '../stores/students'
+import VoiceRecorder from './VoiceRecorder.vue'
 
 const router = useRouter()
 const studentsStore = useStudentsStore()
@@ -190,212 +201,77 @@ const emit = defineEmits(['navigate-with-data'])
 
 // 状态
 const showPanel = ref(false)
-const isListening = ref(false)
 const isProcessing = ref(false)
 const recognizedText = ref('')
 const manualText = ref('')
 const parseResult = ref(null)
 const position = ref({ x: window.innerWidth - 70, y: window.innerHeight - 200 })
+const voiceRecorderRef = ref(null)
 
-// 检测是否在微信浏览器中
-const isWeChat = computed(() => {
-  return /MicroMessenger/i.test(navigator.userAgent)
-})
-
-// 语音识别相关
-let recognition = null
-let speechSupported = false
-let debounceTimer = null  // 防抖定时器
-let accumulatedText = ''   // 累积的文本
-
+// 检测是否支持语音识别
+const isSupported = ref(false)
 onMounted(() => {
-  // 检查浏览器是否支持语音识别
+  // 检查 Web Speech API 支持
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-  
-  // 微信浏览器虽然可能检测到 SpeechRecognition，但实际上不支持
-  if (SpeechRecognition && !isWeChat.value) {
-    speechSupported = true
-    recognition = new SpeechRecognition()
-    recognition.continuous = true  // 改为连续模式，以便检测停顿
-    recognition.interimResults = true
-    recognition.lang = 'zh-CN'
-
-    recognition.onstart = () => {
-      isListening.value = true
-      accumulatedText = ''  // 重置累积文本
-      // 清除之前的定时器
-      if (debounceTimer) {
-        clearTimeout(debounceTimer)
-        debounceTimer = null
-      }
-    }
-
-    recognition.onresult = (event) => {
-      let finalTranscript = ''
-      let interimTranscript = ''
-
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript
-        if (event.results[i].isFinal) {
-          finalTranscript += transcript
-        } else {
-          interimTranscript += transcript
-        }
-      }
-
-      // 累积最终结果
-      if (finalTranscript) {
-        accumulatedText += finalTranscript
-      }
-
-      // 显示当前识别的文本（最终结果 + 临时结果）
-      recognizedText.value = accumulatedText + interimTranscript
-      
-      // 清除之前的定时器
-      if (debounceTimer) {
-        clearTimeout(debounceTimer)
-        debounceTimer = null
-      }
-      
-      // 如果有临时结果，等待1秒没有新的输入才处理
-      if (interimTranscript) {
-        // 设置1秒防抖，如果1秒内没有新的结果，则处理累积的文本
-        debounceTimer = setTimeout(() => {
-          const textToProcess = accumulatedText + interimTranscript
-          if (textToProcess.trim()) {
-            processVoiceInput(textToProcess.trim())
-          }
-          debounceTimer = null
-        }, 1000)
-      } else if (finalTranscript && !interimTranscript) {
-        // 如果只有最终结果且没有临时结果，说明识别结束，立即处理
-        const textToProcess = accumulatedText.trim()
-        if (textToProcess) {
-          processVoiceInput(textToProcess)
-        }
-      }
-    }
-
-    recognition.onerror = (event) => {
-      console.error('语音识别错误:', event.error, event)
-      isListening.value = false
-      
-      // 清除定时器
-      if (debounceTimer) {
-        clearTimeout(debounceTimer)
-        debounceTimer = null
-      }
-      
-      if (event.error === 'not-allowed') {
-        showFailToast('请允许麦克风权限')
-      } else if (event.error === 'no-speech') {
-        // 如果没有检测到语音，不显示错误，可能是正常的停顿
-        // 如果累积了文本，处理它
-        if (accumulatedText.trim()) {
-          processVoiceInput(accumulatedText.trim())
-        }
-      } else if (event.error === 'service-not-allowed') {
-        // 服务不允许（可能是浏览器不支持或未启用）
-        if (isWeChat.value) {
-          showFailToast('微信浏览器暂不支持语音识别，请使用文字输入')
-        } else {
-          showFailToast('浏览器不支持语音识别功能，请使用文字输入')
-        }
-      } else if (event.error === 'aborted') {
-        // 用户中止或系统中止，不显示错误
-        console.log('语音识别已中止')
-      } else if (event.error === 'network') {
-        showFailToast('网络错误，请检查网络连接')
-      } else if (event.error === 'audio-capture') {
-        showFailToast('无法访问麦克风，请检查设备设置')
-      } else {
-        // 其他错误，显示详细错误信息（开发环境）或通用提示（生产环境）
-        const errorMsg = import.meta.env.DEV 
-          ? `语音识别出错: ${event.error}` 
-          : (isWeChat.value ? '微信浏览器暂不支持语音识别，请使用文字输入' : '语音识别出错，请使用文字输入')
-        showFailToast(errorMsg)
-      }
-    }
-
-    recognition.onend = () => {
-      isListening.value = false
-      
-      // 清除定时器
-      if (debounceTimer) {
-        clearTimeout(debounceTimer)
-        debounceTimer = null
-      }
-      
-      // 如果识别结束且有累积的文本，处理它
-      if (accumulatedText.trim() && !isProcessing.value) {
-        processVoiceInput(accumulatedText.trim())
-      }
-    }
-  }
+  isSupported.value = !!SpeechRecognition
 })
 
-onUnmounted(() => {
-  // 清除定时器
-  if (debounceTimer) {
-    clearTimeout(debounceTimer)
-    debounceTimer = null
+// 从 VoiceRecorder 组件获取状态
+const isListening = computed(() => voiceRecorderRef.value?.isListening || false)
+
+// 处理语音识别文本
+let textProcessTimer = null
+const handleVoiceText = (text) => {
+  recognizedText.value = text
+  
+  // 清除之前的定时器
+  if (textProcessTimer) {
+    clearTimeout(textProcessTimer)
+    textProcessTimer = null
   }
   
-  if (recognition) {
-    recognition.abort()
+  // 如果识别已结束，立即处理
+  if (text && text.trim() && !isProcessing.value && !isListening.value) {
+    processVoiceInput(text.trim())
+  } else if (text && text.trim() && !isProcessing.value) {
+    // 如果还在识别中，等待一小段时间（200ms）确保文本稳定后再处理
+    textProcessTimer = setTimeout(() => {
+      if (!isProcessing.value && !isListening.value && recognizedText.value === text) {
+        processVoiceInput(text.trim())
+      }
+      textProcessTimer = null
+    }, 200)
   }
-})
+}
+
+// 处理语音识别结果
+const handleVoiceResult = async (result) => {
+  // 直接使用解析结果
+  parseResult.value = result
+  
+  if (result.success && result.intent) {
+    showSuccessToast('解析成功')
+  }
+}
+
+// 处理语音识别错误
+const handleVoiceError = (error) => {
+  console.error('语音识别错误:', error)
+  if (error && error !== 'aborted' && error !== 'no-speech') {
+    showFailToast(error.message || error || '语音识别出错')
+  }
+}
 
 const togglePanel = () => {
   showPanel.value = !showPanel.value
 }
 
-const toggleListening = () => {
-  if (!speechSupported) {
-    // 检测是否在微信浏览器中
-    const isWeChat = /MicroMessenger/i.test(navigator.userAgent)
-    const errorMsg = isWeChat 
-      ? '微信浏览器暂不支持语音识别，请使用文字输入'
-      : '您的浏览器不支持语音识别，请使用文字输入'
-    showFailToast(errorMsg)
-    return
-  }
-
-  if (isListening.value) {
-    // 停止录音时，清除定时器并处理累积的文本
-    if (debounceTimer) {
-      clearTimeout(debounceTimer)
-      debounceTimer = null
-    }
-    
-    // 如果有累积的文本，先处理它
-    if (accumulatedText.trim() && !isProcessing.value) {
-      processVoiceInput(accumulatedText.trim())
-    }
-    
-    try {
-      recognition.stop()
-    } catch (e) {
-      console.warn('停止语音识别失败:', e)
-      isListening.value = false
-    }
-  } else {
-    resetState()
-    accumulatedText = ''  // 重置累积文本
-    try {
-      recognition.start()
-    } catch (e) {
-      console.error('启动语音识别失败:', e)
-      isListening.value = false
-      const errorMsg = isWeChat.value
-        ? '微信浏览器暂不支持语音识别，请使用文字输入'
-        : '启动语音识别失败，请使用文字输入'
-      showFailToast(errorMsg)
-    }
-  }
-}
-
 const resetState = () => {
+  // 清除文本处理定时器
+  if (textProcessTimer) {
+    clearTimeout(textProcessTimer)
+    textProcessTimer = null
+  }
   recognizedText.value = ''
   parseResult.value = null
   manualText.value = ''
@@ -409,19 +285,20 @@ const processManualInput = () => {
 }
 
 const processVoiceInput = async (text) => {
-  // 停止语音识别，避免继续监听
-  if (recognition && isListening.value) {
-    try {
-      recognition.stop()
-    } catch (e) {
-      console.warn('停止语音识别失败:', e)
-    }
+  // 清除文本处理定时器
+  if (textProcessTimer) {
+    clearTimeout(textProcessTimer)
+    textProcessTimer = null
   }
   
-  // 清除防抖定时器
-  if (debounceTimer) {
-    clearTimeout(debounceTimer)
-    debounceTimer = null
+  // 停止语音识别，避免继续监听
+  if (voiceRecorderRef.value && isListening.value) {
+    voiceRecorderRef.value.stop()
+  }
+  
+  // 如果已经在处理中，忽略
+  if (isProcessing.value) {
+    return
   }
   
   isProcessing.value = true
@@ -458,12 +335,8 @@ const confirmAction = () => {
   if (!parseResult.value?.success || !parseResult.value?.intent) return
 
   // 确保停止语音识别
-  if (recognition && isListening.value) {
-    try {
-      recognition.stop()
-    } catch (e) {
-      console.warn('停止语音识别失败:', e)
-    }
+  if (voiceRecorderRef.value && isListening.value) {
+    voiceRecorderRef.value.stop()
   }
 
   const intent = parseResult.value.intent
@@ -804,7 +677,7 @@ const confirmAction = () => {
   color: #1989fa;
 }
 
-.wechat-tip {
+.unsupported-tip {
   margin-top: 12px;
   padding: 10px;
   background: #fffbe8;
@@ -816,7 +689,7 @@ const confirmAction = () => {
   color: #ed6a0c;
 }
 
-.wechat-tip .van-icon {
+.unsupported-tip .van-icon {
   font-size: 16px;
   flex-shrink: 0;
 }

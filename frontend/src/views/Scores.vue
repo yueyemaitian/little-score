@@ -1,7 +1,5 @@
 <template>
   <div class="page-container scores-container">
-    <van-nav-bar />
-    
     <!-- 学生选择 -->
     <van-cell-group inset style="margin: 12px;">
       <van-field
@@ -138,7 +136,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showFailToast, showSuccessToast, showToast } from 'vant'
 import { scoresApi } from '../api/scores'
@@ -341,10 +339,9 @@ const getIncreaseTitle = (item) => {
   return parts.length > 0 ? parts.join(' | ') : '任务奖励'
 }
 
-onMounted(async () => {
-  await studentsStore.fetchStudents()
-  
-  // 处理 URL 参数中的 student_id（从首页跳转过来）
+// 处理预填数据和打开表单的函数
+const handlePrefillData = async () => {
+  // 处理 URL 参数中的 student_id（从语音助手跳转过来）
   if (route.query.student_id) {
     const studentId = parseInt(route.query.student_id)
     const student = studentsStore.students.find(s => s.id === studentId)
@@ -353,15 +350,12 @@ onMounted(async () => {
       selectedStudentName.value = student.name
       studentsStore.setCurrentStudent(studentId)
     }
-  } else if (studentsStore.students.length > 0) {
-    currentStudentId.value = studentsStore.currentStudent.id
-    selectedStudentName.value = studentsStore.currentStudent.name
   }
   
-  await fetchRewardOptions()
-  await fetchSummary()
-  await fetchIncreases()
-  await fetchExchanges()
+  // 确保已加载奖励选项
+  if (rewardOptions.value.length === 0) {
+    await fetchRewardOptions()
+  }
   
   // 检查是否有预填数据（从语音助手跳转）
   if (route.query.action === 'exchange' && route.query.prefill) {
@@ -391,7 +385,11 @@ onMounted(async () => {
       }
       
       // 清除 URL 参数，避免刷新页面重复打开
-      router.replace({ path: '/scores' })
+      const newQuery = { ...route.query }
+      delete newQuery.action
+      delete newQuery.prefill
+      delete newQuery._t
+      router.replace({ path: '/scores', query: newQuery })
     } catch (e) {
       console.error('解析预填数据失败:', e)
     }
@@ -400,14 +398,52 @@ onMounted(async () => {
     activeTab.value = 2
     showExchangeForm.value = true
     // 清除 URL 参数
-    router.replace({ path: '/scores' })
+    const newQuery = { ...route.query }
+    delete newQuery.action
+    delete newQuery._t
+    router.replace({ path: '/scores', query: newQuery })
   } else if (route.query.tab === 'exchanges') {
     // 从首页点击已兑换积分跳转过来，切换到兑换记录标签页
     activeTab.value = 2
     // 清除 URL 参数
-    router.replace({ path: '/scores' })
+    const newQuery = { ...route.query }
+    delete newQuery.tab
+    router.replace({ path: '/scores', query: newQuery })
   }
+}
+
+onMounted(async () => {
+  await studentsStore.fetchStudents()
+  
+  // 处理 URL 参数中的 student_id（从首页跳转过来）
+  if (route.query.student_id) {
+    const studentId = parseInt(route.query.student_id)
+    const student = studentsStore.students.find(s => s.id === studentId)
+    if (student) {
+      currentStudentId.value = studentId
+      selectedStudentName.value = student.name
+      studentsStore.setCurrentStudent(studentId)
+    }
+  } else if (studentsStore.students.length > 0) {
+    currentStudentId.value = studentsStore.currentStudent.id
+    selectedStudentName.value = studentsStore.currentStudent.name
+  }
+  
+  await fetchRewardOptions()
+  await fetchSummary()
+  await fetchIncreases()
+  await fetchExchanges()
+  
+  // 处理预填数据
+  await handlePrefillData()
 })
+
+// 监听路由变化，处理预填数据（当用户在积分页面时，路由参数变化也能响应）
+watch(() => route.query, async (newQuery) => {
+  if (newQuery.action === 'exchange' || newQuery.tab === 'exchanges') {
+    await handlePrefillData()
+  }
+}, { deep: true })
 </script>
 
 <style scoped>

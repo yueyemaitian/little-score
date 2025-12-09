@@ -3,7 +3,7 @@ import json
 import re
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -394,6 +394,118 @@ async def _validate_exchange_data(
     intent.data = data
     intent.warnings = warnings
     return intent
+
+
+@router.post("/recognize-audio")
+async def recognize_audio(
+    audio: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    识别音频文件并返回解析结果（用于微信浏览器等不支持 Web Speech API 的环境）
+    
+    使用 OpenAI Whisper API 进行语音识别，然后解析指令
+    """
+    if not settings.AI_API_KEY:
+        raise HTTPException(
+            status_code=503,
+            detail="AI 服务未配置，请联系管理员设置 AI_API_KEY"
+        )
+    
+    try:
+        # 读取音频文件
+        audio_content = await audio.read()
+        
+        # 使用 OpenAI Whisper API 进行语音识别
+        client = AsyncOpenAI(
+            api_key=settings.AI_API_KEY,
+            base_url=settings.AI_API_BASE_URL,
+        )
+        
+        # 将音频内容转换为文件对象
+        import io
+        audio_file = io.BytesIO(audio_content)
+        audio_file.name = audio.filename or "audio.webm"
+        
+        # 调用 Whisper API 进行语音识别
+        try:
+            # 注意：需要 OpenAI API 支持 audio.transcriptions
+            # 如果使用 DeepSeek/Qwen，可能需要使用其他语音识别服务
+            transcription = await client.audio.transcriptions.create(
+                model="whisper-1",
+                file=audio_file,
+                language="zh"
+            )
+            text = transcription.text
+        except Exception as e:
+            # 如果不支持 Whisper，提示用户使用文字输入
+            # 未来可以集成百度、讯飞、阿里云等语音识别服务
+            raise HTTPException(
+                status_code=501,
+                detail=f"当前 AI 服务不支持音频识别: {str(e)}。请使用文字输入功能。"
+            )
+        
+        # 使用识别出的文本调用解析接口
+        user_context = await _build_user_context(db, current_user.id)
+        full_system_prompt = SYSTEM_PROMPT + user_context
+        
+        response = await client.chat.completions.create(
+            model=settings.AI_MODEL,
+            messages=[
+                {"role": "system", "content": full_system_prompt},
+                {"role": "user", "content": text}
+            ],
+            temperature=0.3,
+            max_tokens=500,
+        )
+        
+        content = response.choices[0].message.content
+        
+        # 解析 JSON
+        try:
+            parsed = json.loads(content)
+        except json.JSONDecodeError:
+            json_match = re.search(r'```(?:json)?\s*([\s\S]*?)```', content)
+            if json_match:
+                parsed = json.loads(json_match.group(1))
+            else:
+                json_match = re.search(r'\{[\s\S]*\}', content)
+                if json_match:
+                    parsed = json.loads(json_match.group(0))
+                else:
+                    raise ValueError("无法从响应中提取 JSON")
+        
+        data = parsed.get("data", {})
+        if parsed.get("corrected_text"):
+            data["corrected_text"] = parsed.get("corrected_text")
+        
+        intent = ParsedIntent(
+            action=parsed.get("action", "unknown"),
+            confidence=parsed.get("confidence", 0.5),
+            data=data,
+            message=parsed.get("message"),
+            warnings=[]
+        )
+        
+        # 验证数据
+        if intent.action == "add_task":
+            intent = await _validate_task_data(db, intent, current_user.id)
+        elif intent.action == "exchange_points":
+            intent = await _validate_exchange_data(db, intent, current_user.id)
+        
+        return VoiceCommandResponse(
+            success=True,
+            intent=intent
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        return VoiceCommandResponse(
+            success=False,
+            error=f"语音识别失败: {str(e)}"
+        )
 
 
 @router.get("/available-options")

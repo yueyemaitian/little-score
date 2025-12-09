@@ -1,6 +1,5 @@
 <template>
   <div class="login-container">
-    <van-nav-bar />
     <div class="login-content">
       <van-form @submit="onSubmit">
         <van-cell-group inset>

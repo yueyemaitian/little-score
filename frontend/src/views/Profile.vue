@@ -1,7 +1,5 @@
 <template>
   <div class="page-container profile-container">
-    <van-nav-bar />
-    
     <van-tabs v-model:active="activeTab">
       <van-tab title="学生管理">
         <div class="students-section">
