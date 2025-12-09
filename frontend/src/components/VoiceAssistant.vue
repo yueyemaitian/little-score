@@ -154,11 +154,15 @@
               size="large"
               :icon="isListening ? 'pause-circle-o' : 'audio'"
               @click="toggleListening"
-              :disabled="isProcessing"
+              :disabled="isProcessing || isWeChat"
               :loading="isProcessing"
             >
               {{ isListening ? '停止录音' : '开始语音输入' }}
             </van-button>
+            <div v-if="isWeChat" class="wechat-tip">
+              <van-icon name="info-o" />
+              <span>微信浏览器暂不支持语音识别，请使用上方文字输入</span>
+            </div>
           </div>
 
           <!-- 使用提示 -->
@@ -174,7 +178,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showFailToast, showSuccessToast } from 'vant'
 import { aiApi } from '../api/ai'
@@ -193,6 +197,11 @@ const manualText = ref('')
 const parseResult = ref(null)
 const position = ref({ x: window.innerWidth - 70, y: window.innerHeight - 200 })
 
+// 检测是否在微信浏览器中
+const isWeChat = computed(() => {
+  return /MicroMessenger/i.test(navigator.userAgent)
+})
+
 // 语音识别相关
 let recognition = null
 let speechSupported = false
@@ -202,7 +211,9 @@ let accumulatedText = ''   // 累积的文本
 onMounted(() => {
   // 检查浏览器是否支持语音识别
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-  if (SpeechRecognition) {
+  
+  // 微信浏览器虽然可能检测到 SpeechRecognition，但实际上不支持
+  if (SpeechRecognition && !isWeChat.value) {
     speechSupported = true
     recognition = new SpeechRecognition()
     recognition.continuous = true  // 改为连续模式，以便检测停顿
@@ -266,7 +277,7 @@ onMounted(() => {
     }
 
     recognition.onerror = (event) => {
-      console.error('语音识别错误:', event.error)
+      console.error('语音识别错误:', event.error, event)
       isListening.value = false
       
       // 清除定时器
@@ -283,8 +294,26 @@ onMounted(() => {
         if (accumulatedText.trim()) {
           processVoiceInput(accumulatedText.trim())
         }
+      } else if (event.error === 'service-not-allowed') {
+        // 服务不允许（可能是浏览器不支持或未启用）
+        if (isWeChat.value) {
+          showFailToast('微信浏览器暂不支持语音识别，请使用文字输入')
+        } else {
+          showFailToast('浏览器不支持语音识别功能，请使用文字输入')
+        }
+      } else if (event.error === 'aborted') {
+        // 用户中止或系统中止，不显示错误
+        console.log('语音识别已中止')
+      } else if (event.error === 'network') {
+        showFailToast('网络错误，请检查网络连接')
+      } else if (event.error === 'audio-capture') {
+        showFailToast('无法访问麦克风，请检查设备设置')
       } else {
-        showFailToast('语音识别出错，请重试')
+        // 其他错误，显示详细错误信息（开发环境）或通用提示（生产环境）
+        const errorMsg = import.meta.env.DEV 
+          ? `语音识别出错: ${event.error}` 
+          : (isWeChat.value ? '微信浏览器暂不支持语音识别，请使用文字输入' : '语音识别出错，请使用文字输入')
+        showFailToast(errorMsg)
       }
     }
 
@@ -323,7 +352,12 @@ const togglePanel = () => {
 
 const toggleListening = () => {
   if (!speechSupported) {
-    showFailToast('您的浏览器不支持语音识别，请使用文字输入')
+    // 检测是否在微信浏览器中
+    const isWeChat = /MicroMessenger/i.test(navigator.userAgent)
+    const errorMsg = isWeChat 
+      ? '微信浏览器暂不支持语音识别，请使用文字输入'
+      : '您的浏览器不支持语音识别，请使用文字输入'
+    showFailToast(errorMsg)
     return
   }
 
@@ -339,11 +373,25 @@ const toggleListening = () => {
       processVoiceInput(accumulatedText.trim())
     }
     
-    recognition.stop()
+    try {
+      recognition.stop()
+    } catch (e) {
+      console.warn('停止语音识别失败:', e)
+      isListening.value = false
+    }
   } else {
     resetState()
     accumulatedText = ''  // 重置累积文本
-    recognition.start()
+    try {
+      recognition.start()
+    } catch (e) {
+      console.error('启动语音识别失败:', e)
+      isListening.value = false
+      const errorMsg = isWeChat.value
+        ? '微信浏览器暂不支持语音识别，请使用文字输入'
+        : '启动语音识别失败，请使用文字输入'
+      showFailToast(errorMsg)
+    }
   }
 }
 
@@ -754,6 +802,23 @@ const confirmAction = () => {
   position: absolute;
   left: 4px;
   color: #1989fa;
+}
+
+.wechat-tip {
+  margin-top: 12px;
+  padding: 10px;
+  background: #fffbe8;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #ed6a0c;
+}
+
+.wechat-tip .van-icon {
+  font-size: 16px;
+  flex-shrink: 0;
 }
 </style>
 
