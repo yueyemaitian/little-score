@@ -20,11 +20,12 @@ services:
       - "--innodb_buffer_pool_size=128M"
       - "--innodb_log_buffer_size=16M"
       - "--key_buffer_size=8M"
-      - "--query_cache_size=0"
       - "--tmp_table_size=32M"
       - "--max_heap_table_size=32M"
       - "--table_open_cache=256"
       - "--max_connections=120"
+      # 关闭性能_schema 可选：减少内存占用（如需监控可移除）
+      - "--performance_schema=OFF"
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-little_score}
