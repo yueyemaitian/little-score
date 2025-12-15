@@ -427,6 +427,9 @@ const confirmAction = () => {
 .voice-bubble {
   --van-floating-bubble-size: 52px;
   --van-floating-bubble-background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  position: absolute !important; /* 覆盖组件默认的 fixed，保证在“壳”内部 */
+  right: 16px;
+  bottom: 80px;
 }
 
 .assistant-panel {

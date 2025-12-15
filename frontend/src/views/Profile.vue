@@ -1,5 +1,5 @@
 <template>
-  <div class="page-container profile-container">
+  <div class="profile-container">
     <van-tabs v-model:active="activeTab">
       <van-tab title="学生管理">
         <div class="students-section">
@@ -150,8 +150,6 @@
       <RewardOptionList v-if="showRewardOptions" @close="showRewardOptions = false" />
     </van-popup>
 
-    <!-- 底部导航 -->
-    <BottomNav />
   </div>
 </template>
 
@@ -169,7 +167,6 @@ import ProjectList from '../components/ProjectList.vue'
 import ProjectForm from '../components/ProjectForm.vue'
 import PunishmentOptionList from '../components/PunishmentOptionList.vue'
 import RewardOptionList from '../components/RewardOptionList.vue'
-import BottomNav from '../components/BottomNav.vue'
 
 const router = useRouter()
 const route = useRoute()

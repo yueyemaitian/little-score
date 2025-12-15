@@ -1,16 +1,12 @@
 <template>
-  <div class="page-container tasks-container">
-    <!-- 学生选择 -->
-    <van-cell-group inset style="margin: 12px;">
-      <van-field
-        v-model="selectedStudentName"
-        readonly
-        label="选择学生"
-        placeholder="选择学生"
-        is-link
-        @click="showStudentPicker = true"
-      />
-    </van-cell-group>
+  <div class="tasks-container">
+    <!-- 学生头部（含选择） -->
+    <StudentHeader
+      :student="currentStudent"
+      :all-students="studentsStore.students"
+      @switch="handleStudentSwitch"
+      @add="handleAddStudent"
+    />
 
     <!-- 筛选条件 -->
     <van-cell-group inset style="margin: 0 12px 12px;">
@@ -86,17 +82,6 @@
       @click="handleAddTask"
     />
 
-    <!-- 学生选择器 -->
-    <van-popup v-model:show="showStudentPicker" position="bottom">
-      <van-picker
-        :columns="studentColumns"
-        :default-index="studentDefaultIndex"
-        @confirm="onStudentConfirm"
-        @cancel="showStudentPicker = false"
-        @click-option="(params) => handlePickerDoubleClick(params, onStudentConfirm)"
-      />
-    </van-popup>
-
     <!-- 一级项目选择器 -->
     <van-popup v-model:show="showProject1Picker" position="bottom">
       <van-picker
@@ -147,8 +132,6 @@
       />
     </van-popup>
 
-    <!-- 底部导航 -->
-    <BottomNav />
   </div>
 </template>
 
@@ -161,7 +144,7 @@ import { projectsApi } from '../api/projects'
 import { useStudentsStore } from '../stores/students'
 import { useEnumsStore } from '../stores/enums'
 import TaskForm from '../components/TaskForm.vue'
-import BottomNav from '../components/BottomNav.vue'
+import StudentHeader from '../components/StudentHeader.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -173,8 +156,6 @@ const prefillData = ref(null)
 const loading = ref(false)
 const tasks = ref([])
 const currentStudentId = ref(null)
-const selectedStudentName = ref('')
-const showStudentPicker = ref(false)
 const showProject1Picker = ref(false)
 const showProject2Picker = ref(false)
 const showStatusPicker = ref(false)
@@ -190,8 +171,9 @@ const filters = ref({
 const level1Projects = ref([])
 const level2Projects = ref([])
 
-const studentColumns = computed(() => {
-  return studentsStore.students.map(s => ({ text: s.name, value: s.id }))
+const currentStudent = computed(() => {
+  if (!studentsStore.students.length) return null
+  return studentsStore.students.find(s => s.id === currentStudentId.value)
 })
 
 const project1Columns = computed(() => {
@@ -228,12 +210,6 @@ const statusFilterDisplayText = computed(() => {
 })
 
 // 默认索引（用于设置初始选中项）
-const studentDefaultIndex = computed(() => {
-  if (!currentStudentId.value) return 0
-  const index = studentsStore.students.findIndex(s => s.id === currentStudentId.value)
-  return index >= 0 ? index : 0
-})
-
 const project1DefaultIndex = computed(() => {
   if (!filters.value.project_level1_id) return 0
   const index = level1Projects.value.findIndex(p => p.id === filters.value.project_level1_id)
@@ -320,12 +296,14 @@ const fetchProjects = async () => {
   }
 }
 
-const onStudentConfirm = ({ selectedOptions }) => {
-  currentStudentId.value = selectedOptions[0].value
-  selectedStudentName.value = selectedOptions[0].text
-  studentsStore.setCurrentStudent(currentStudentId.value)
-  showStudentPicker.value = false
+const handleStudentSwitch = (studentId) => {
+  currentStudentId.value = studentId
+  studentsStore.setCurrentStudent(studentId)
   fetchTasks()
+}
+
+const handleAddStudent = () => {
+  router.push({ path: '/profile', query: { action: 'add-student' } })
 }
 
 const onProject1Confirm = ({ selectedOptions }) => {
@@ -450,7 +428,6 @@ const handlePrefillData = async () => {
     const student = studentsStore.students.find(s => s.id === studentId)
     if (student) {
       currentStudentId.value = studentId
-      selectedStudentName.value = student.name
       studentsStore.setCurrentStudent(studentId)
     }
   }
@@ -501,7 +478,6 @@ onMounted(async () => {
   if (studentsStore.students.length > 0) {
     if (!currentStudentId.value) {
       currentStudentId.value = studentsStore.currentStudent.id
-      selectedStudentName.value = studentsStore.currentStudent.name
     }
   }
   

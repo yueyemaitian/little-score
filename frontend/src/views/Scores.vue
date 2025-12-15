@@ -1,16 +1,12 @@
 <template>
-  <div class="page-container scores-container">
-    <!-- 学生选择 -->
-    <van-cell-group inset style="margin: 12px;">
-      <van-field
-        v-model="selectedStudentName"
-        readonly
-        label="选择学生"
-        placeholder="选择学生"
-        is-link
-        @click="showStudentPicker = true"
-      />
-    </van-cell-group>
+  <div class="scores-container">
+    <!-- 学生头部（含选择） -->
+    <StudentHeader
+      :student="currentStudent"
+      :all-students="studentsStore.students"
+      @switch="handleStudentSwitch"
+      @add="handleAddStudent"
+    />
 
     <van-tabs v-model:active="activeTab">
       <van-tab title="积分汇总">
@@ -75,15 +71,6 @@
       </van-tab>
     </van-tabs>
 
-    <!-- 学生选择器 -->
-    <van-popup v-model:show="showStudentPicker" position="bottom">
-      <van-picker
-        :columns="studentColumns"
-        @confirm="onStudentConfirm"
-        @cancel="showStudentPicker = false"
-      />
-    </van-popup>
-
     <!-- 兑换弹窗 -->
     <van-popup v-model:show="showExchangeForm" position="bottom" :style="{ height: '50%' }">
       <van-nav-bar
@@ -130,8 +117,6 @@
       />
     </van-popup>
 
-    <!-- 底部导航 -->
-    <BottomNav />
   </div>
 </template>
 
@@ -141,17 +126,15 @@ import { useRoute, useRouter } from 'vue-router'
 import { showFailToast, showSuccessToast, showToast } from 'vant'
 import { scoresApi } from '../api/scores'
 import { useStudentsStore } from '../stores/students'
-import BottomNav from '../components/BottomNav.vue'
 import { extractErrorMessage } from '../utils/errorHandler'
 import { formatLocalDateTime } from '../utils/date'
+import StudentHeader from '../components/StudentHeader.vue'
 
 const route = useRoute()
 const router = useRouter()
 const studentsStore = useStudentsStore()
 
 const currentStudentId = ref(null)
-const selectedStudentName = ref('')
-const showStudentPicker = ref(false)
 const activeTab = ref(0)
 const loadingIncreases = ref(false)
 const loadingExchanges = ref(false)
@@ -168,8 +151,9 @@ const exchangeForm = ref({
   reward_option_id: null
 })
 
-const studentColumns = computed(() => {
-  return studentsStore.students.map(s => ({ text: s.name, value: s.id }))
+const currentStudent = computed(() => {
+  if (!studentsStore.students.length) return null
+  return studentsStore.students.find(s => s.id === currentStudentId.value)
 })
 
 const rewardColumns = computed(() => {
@@ -188,13 +172,6 @@ const rewardOptionDisplayText = computed(() => {
 
 const selectedRewardCost = computed(() => {
   return selectedRewardOption.value ? selectedRewardOption.value.cost_points : null
-})
-
-// 默认索引（用于设置初始选中项）
-const studentDefaultIndex = computed(() => {
-  if (!currentStudentId.value) return 0
-  const index = studentsStore.students.findIndex(s => s.id === currentStudentId.value)
-  return index >= 0 ? index : 0
 })
 
 const rewardDefaultIndex = computed(() => {
@@ -264,14 +241,16 @@ const fetchRewardOptions = async () => {
   }
 }
 
-const onStudentConfirm = ({ selectedOptions }) => {
-  currentStudentId.value = selectedOptions[0].value
-  selectedStudentName.value = selectedOptions[0].text
-  studentsStore.setCurrentStudent(currentStudentId.value)
-  showStudentPicker.value = false
+const handleStudentSwitch = (studentId) => {
+  currentStudentId.value = studentId
+  studentsStore.setCurrentStudent(studentId)
   fetchSummary()
   fetchIncreases()
   fetchExchanges()
+}
+
+const handleAddStudent = () => {
+  router.push({ path: '/profile', query: { action: 'add-student' } })
 }
 
 const onRewardConfirm = ({ selectedOptions }) => {
@@ -347,7 +326,6 @@ const handlePrefillData = async () => {
     const student = studentsStore.students.find(s => s.id === studentId)
     if (student) {
       currentStudentId.value = studentId
-      selectedStudentName.value = student.name
       studentsStore.setCurrentStudent(studentId)
     }
   }
@@ -421,12 +399,10 @@ onMounted(async () => {
     const student = studentsStore.students.find(s => s.id === studentId)
     if (student) {
       currentStudentId.value = studentId
-      selectedStudentName.value = student.name
       studentsStore.setCurrentStudent(studentId)
     }
   } else if (studentsStore.students.length > 0) {
     currentStudentId.value = studentsStore.currentStudent.id
-    selectedStudentName.value = studentsStore.currentStudent.name
   }
   
   await fetchRewardOptions()

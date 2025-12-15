@@ -1,5 +1,11 @@
 <template>
-  <van-tabbar v-model="activeTabbar" @change="onTabbarChange" fixed placeholder>
+  <van-tabbar
+    v-model="activeTabbar"
+    @change="onTabbarChange"
+    :fixed="false"
+    class="app-tabbar"
+    active-color="#4A90E2"
+  >
     <van-tabbar-item icon="home-o" to="/">首页</van-tabbar-item>
     <van-tabbar-item icon="orders-o" to="/tasks">任务</van-tabbar-item>
     <van-tabbar-item icon="gold-coin-o" to="/scores">积分</van-tabbar-item>
@@ -43,23 +49,9 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 确保底部导航栏在所有设备上都显示 */
-:deep(.van-tabbar) {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
-}
-
-/* 桌面端也显示，但可以调整样式 */
-@media (min-width: 1024px) {
-  :deep(.van-tabbar) {
-    max-width: 600px;
-    left: 50%;
-    transform: translateX(-50%);
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-  }
+.app-tabbar {
+  border-top: 1px solid #e5e7eb;
+  background-color: #ffffff;
 }
 </style>
 
