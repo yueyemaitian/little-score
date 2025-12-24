@@ -1,67 +1,51 @@
 <template>
   <div class="profile-container">
-    <van-tabs v-model:active="activeTab">
-      <van-tab title="学生管理">
-        <div class="students-section">
-          <van-loading v-if="loading" vertical>加载中...</van-loading>
-          <div v-else>
-            <van-empty v-if="students.length === 0" description="暂无学生，请添加" />
-            <van-cell-group v-else inset style="margin: 12px;">
-              <van-cell
-                v-for="student in students"
-                :key="student.id"
-                :title="student.name"
-                :label="getStudentLabel(student)"
-                is-link
-                @click="editStudent(student)"
-              >
-                <template #right-icon>
-                  <van-icon name="delete-o" @click.stop="handleDeleteStudent(student)" />
-                </template>
-              </van-cell>
-            </van-cell-group>
-          </div>
-          <div class="add-student-actions">
-            <van-button round block type="primary" icon="plus" @click="handleAddStudent">
-              新增学生
-            </van-button>
-          </div>
-          <van-floating-bubble
-            axis="xy"
-            icon="plus"
-            @click="handleAddStudent"
-          />
-        </div>
-      </van-tab>
-      
-      <van-tab title="配置管理">
-            <div class="projects-section">
-              <van-loading v-if="loadingProjects" vertical>加载中...</van-loading>
-              <div v-else>
-                <van-cell-group inset style="margin: 12px;">
-                  <van-cell title="一级项目" is-link @click="showProject1List = true" />
-                  <van-cell title="二级项目" is-link @click="showProject2List = true" />
-                </van-cell-group>
-                
-                <!-- 选项管理 -->
-                <van-cell-group inset style="margin: 12px;" title="选项管理">
-                  <van-cell title="惩罚选项" is-link @click="openPunishmentOptions" />
-                  <van-cell title="兑换奖励选项" is-link @click="openRewardOptions" />
-                </van-cell-group>
+    <van-cell-group inset style="margin: 12px;">
+      <van-cell title="学生管理" is-link @click="showStudentList = true" />
+      <van-cell title="一级项目" is-link @click="showProject1List = true" />
+      <van-cell title="二级项目" is-link @click="showProject2List = true" />
+      <van-cell title="惩罚选项" is-link @click="openPunishmentOptions" />
+      <van-cell title="奖励选项" is-link @click="openRewardOptions" />
+      <van-cell title="退出登录" is-link @click="handleLogout" />
+    </van-cell-group>
 
-                <div style="padding: 12px;">
-                  <!-- 按钮移至列表内部 -->
-                </div>
-              </div>
-            </div>
-      </van-tab>
-      
-      <van-tab title="设置">
-        <van-cell-group inset style="margin: 12px;">
-          <van-cell title="退出登录" is-link @click="handleLogout" />
-        </van-cell-group>
-      </van-tab>
-    </van-tabs>
+    <!-- 学生管理列表 -->
+    <van-popup v-model:show="showStudentList" position="bottom" :style="{ height: '80%' }">
+      <van-nav-bar
+        title="学生管理"
+        left-arrow
+        @click-left="showStudentList = false"
+      >
+        <template #right>
+          <van-icon name="plus" @click="handleAddStudent" />
+        </template>
+      </van-nav-bar>
+      <div class="student-list-content">
+        <van-loading v-if="loading" vertical>加载中...</van-loading>
+        <div v-else>
+          <van-empty v-if="students.length === 0" description="暂无学生，请添加" />
+          <van-cell-group v-else inset style="margin: 12px;">
+            <van-cell
+              v-for="student in students"
+              :key="student.id"
+              :title="student.name"
+              :label="getStudentLabel(student)"
+              is-link
+              @click="editStudent(student)"
+            >
+              <template #right-icon>
+                <van-icon name="delete-o" @click.stop="handleDeleteStudent(student)" />
+              </template>
+            </van-cell>
+          </van-cell-group>
+        </div>
+        <div class="add-student-actions" v-if="!loading">
+          <van-button round block type="primary" icon="plus" @click="handleAddStudent">
+            新增学生
+          </van-button>
+        </div>
+      </div>
+    </van-popup>
 
     <!-- 学生表单弹窗 -->
     <van-popup v-model:show="showStudentForm" position="bottom" :style="{ height: '80%' }">
@@ -143,7 +127,7 @@
     <!-- 兑换奖励选项列表 -->
     <van-popup v-model:show="showRewardOptions" position="bottom" :style="{ height: '80%' }">
       <van-nav-bar
-        title="兑换奖励选项"
+        title="奖励选项"
         left-arrow
         @click-left="showRewardOptions = false"
       />
@@ -177,6 +161,7 @@ const enumsStore = useEnumsStore()
 const loading = ref(false)
 const loadingProjects = ref(false)
 const students = ref([])
+const showStudentList = ref(false)
 const showStudentForm = ref(false)
 const editingStudent = ref(null)
 const showProject1List = ref(false)
@@ -186,7 +171,6 @@ const showAddProject2Form = ref(false)
 const showPunishmentOptions = ref(false)
 const showRewardOptions = ref(false)
 const editingProject = ref(null)
-const activeTab = ref(0)
 const wasEmptyBeforeAdd = ref(false) // 记录添加前是否为空
 
 const getStudentLabel = (student) => {
@@ -245,6 +229,10 @@ const handleStudentSuccess = () => {
       // 刚添加了第一个学生，跳转到首页
       router.push('/')
     }
+    // 刷新学生列表显示
+    if (showStudentList.value) {
+      // 如果学生列表弹窗是打开的，保持打开状态
+    }
   })
 }
 
@@ -273,6 +261,10 @@ const handleDeleteStudent = async (student) => {
   }
 }
 
+const goToVoiceTest = () => {
+  router.push('/voice-test')
+}
+
 const handleLogout = async () => {
   try {
     await showConfirmDialog({
@@ -290,8 +282,8 @@ const handleLogout = async () => {
 const handleRouteAction = () => {
   const action = route.query.action
   if (action === 'add-student') {
-    // 切换到学生管理标签页
-    activeTab.value = 0
+    // 打开学生管理列表
+    showStudentList.value = true
     // 打开学生表单
     showStudentForm.value = true
     editingStudent.value = null
@@ -317,29 +309,15 @@ onMounted(() => {
   width: 100%;
 }
 
-.students-section,
-.projects-section {
+.student-list-content {
   padding: 12px;
+  height: calc(80vh - 46px);
+  overflow-y: auto;
 }
 
 .add-student-actions {
   padding: 12px;
-}
-
-@media (min-width: 768px) {
-  .students-section,
-  .projects-section {
-    padding: 16px;
-  }
-}
-
-@media (min-width: 1024px) {
-  .students-section,
-  .projects-section {
-    padding: 24px;
-    max-width: 1000px;
-    margin: 0 auto;
-  }
+  padding-top: 0;
 }
 </style>
 

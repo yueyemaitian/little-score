@@ -11,6 +11,21 @@ export const aiApi = {
   },
 
   /**
+   * 识别音频文件并返回解析结果（用于微信浏览器等不支持 Web Speech API 的环境）
+   * @param {File|Blob} audioFile - 音频文件
+   * @returns {Promise} - 返回解析结果
+   */
+  recognizeAudio(audioFile) {
+    const formData = new FormData()
+    formData.append('audio', audioFile, 'audio.webm')
+    return api.post('/ai/recognize-audio', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+
+  /**
    * 获取可用选项（项目列表、兑换选项等）
    * @returns {Promise} - 返回可用选项
    */

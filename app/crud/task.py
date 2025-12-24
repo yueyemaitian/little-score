@@ -139,6 +139,7 @@ async def _handle_task_completion(db: AsyncSession, task: Task) -> None:
     # 2. 如果是惩罚且需要生成关联任务
     if task.reward_type == "punish" and task.punishment_option_id:
         punishment_option = await db.get(PunishmentOption, task.punishment_option_id)
+        # 如果惩罚选项已被删除，跳过生成关联任务
         if punishment_option and punishment_option.generate_related_task:
             if punishment_option.related_project_level1_id:
                 punishment_task = TaskModel(

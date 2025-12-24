@@ -1,7 +1,12 @@
 <template>
   <div class="login-container">
     <div class="login-content">
-      <van-form @submit="onSubmit">
+      <div class="app-description">
+        <div class="app-title">积分管理</div>
+        <div class="app-slogan">完成任务获得积分，用积分兑换奖励，培养良好习惯</div>
+      </div>
+      <div class="form-wrapper">
+        <van-form @submit="onSubmit">
         <van-cell-group inset>
           <van-field
             v-model="form.email"
@@ -31,6 +36,7 @@
           </div>
         </div>
       </van-form>
+      </div>
     </div>
   </div>
 </template>
@@ -142,16 +148,46 @@ const onSubmit = async () => {
 <style scoped>
 .login-container {
   min-height: 100vh;
+  min-height: 100dvh;
   background: #f7f8fa;
   width: 100%;
   display: flex;
   flex-direction: column;
+  padding-bottom: 0;
 }
 
 .login-content {
   padding-top: 20px;
   width: 100%;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-description {
+  text-align: center;
+  padding: 40px 20px 20px;
+  margin-bottom: 20px;
+  flex-shrink: 0;
+}
+
+.app-title {
+  font-size: 24px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 12px;
+}
+
+.app-slogan {
+  font-size: 15px;
+  color: #6b7280;
+  line-height: 1.5;
+  padding: 0 20px;
+}
+
+.form-wrapper {
+  flex: 1;
+  width: 100%;
 }
 
 @media (min-width: 768px) {

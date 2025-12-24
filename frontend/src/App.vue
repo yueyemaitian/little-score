@@ -6,7 +6,7 @@
         <router-view />
       </div>
       <!-- 底部主导航 -->
-      <BottomNav />
+      <BottomNav v-if="shouldShowBottomNav" />
       <!-- 语音助手组件 - 仅在登录后显示 -->
       <VoiceAssistant v-if="authStore.isAuthenticated" />
     </div>
@@ -14,12 +14,20 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from './stores/auth'
 import VoiceAssistant from './components/VoiceAssistant.vue'
 import BottomNav from './components/BottomNav.vue'
 
 const authStore = useAuthStore()
+const route = useRoute()
+
+// 判断是否应该显示底部导航（登录页和注册页不显示）
+const shouldShowBottomNav = computed(() => {
+  const hideNavRoutes = ['/login', '/register']
+  return !hideNavRoutes.includes(route.path)
+})
 
 onMounted(async () => {
   if (authStore.isAuthenticated) {

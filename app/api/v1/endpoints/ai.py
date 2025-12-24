@@ -40,7 +40,7 @@ class VoiceCommandResponse(BaseModel):
 
 
 # 基础系统提示词（不包含硬编码的选项）
-SYSTEM_PROMPT = """你是一个学生积分管理系统的智能助手，负责解析用户的语音指令。
+SYSTEM_PROMPT = """你是一个积分管理系统的智能助手，负责解析用户的语音指令。
 
 **重要：用户输入是语音识别的结果，可能存在识别错误，你需要智能纠错！**
 
@@ -51,7 +51,7 @@ SYSTEM_PROMPT = """你是一个学生积分管理系统的智能助手，负责�
    
 2. **积分兑换** (action: "exchange_points")  
    - 用户会说类似"积分兑换10元"、"兑换20元"
-   - 需要解析：兑换奖励名称或金额
+   - 需要解析：奖励名称或金额
 
 请根据用户输入，**先进行语音纠错**，然后返回 JSON 格式的解析结果：
 {
@@ -69,7 +69,7 @@ SYSTEM_PROMPT = """你是一个学生积分管理系统的智能助手，负责�
     "punishment_option_name": "惩罚选项名称（当reward_type为'punish'时）",
     
     // 对于 exchange_points:
-    "reward_name": "兑换奖励名称或描述"
+    "reward_name": "奖励名称或描述"
   },
   "message": "给用户的友好提示"
 }
@@ -384,7 +384,7 @@ async def _validate_exchange_data(
         data["reward_option_name"] = matched_option.name
         data["cost_points"] = matched_option.cost_points
     else:
-        warnings.append(f"未找到兑换奖励「{reward_name}」的匹配项，请手动选择")
+        warnings.append(f"未找到奖励「{reward_name}」的匹配项，请手动选择")
         data["reward_option_id"] = None
         # 列出可用选项供参考
         if reward_options:

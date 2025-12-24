@@ -43,6 +43,12 @@ const routes = [
     name: 'Admin',
     component: () => import('../views/Admin.vue'),
     meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
+    path: '/voice-test',
+    name: 'VoiceTest',
+    component: () => import('../views/VoiceTest.vue'),
+    meta: { requiresAuth: true }
   }
 ]
 

@@ -65,10 +65,8 @@ class TaskBase(BaseModel):
             reward_label = get_enum_label("reward_type", RewardType.REWARD.value)
             raise ValueError(f"{reward_label}类型必须提供奖励积分")
         
-        # reward_type=punish 时必须提供 punishment_option_id
-        if self.reward_type == RewardType.PUNISH.value and not self.punishment_option_id:
-            punish_label = get_enum_label("reward_type", RewardType.PUNISH.value)
-            raise ValueError(f"{punish_label}类型必须提供惩罚选项")
+        # reward_type=punish 时，punishment_option_id 的验证由子类处理
+        # TaskCreate 会要求必须提供，TaskRead 允许为 None（惩罚选项可能已被删除）
         
         # reward_type=none 时不应有 reward_points 或 punishment_option_id
         if self.reward_type == RewardType.NONE.value:
@@ -82,7 +80,13 @@ class TaskBase(BaseModel):
 
 
 class TaskCreate(TaskBase):
-    pass
+    @model_validator(mode="after")
+    def validate_create_logic(self):
+        # 创建时，reward_type=punish 必须提供 punishment_option_id
+        if self.reward_type == RewardType.PUNISH.value and not self.punishment_option_id:
+            punish_label = get_enum_label("reward_type", RewardType.PUNISH.value)
+            raise ValueError(f"{punish_label}类型必须提供惩罚选项")
+        return self
 
 
 class TaskUpdate(BaseModel):
@@ -103,6 +107,31 @@ class TaskRead(TaskBase):
     deleted_at: datetime | None = None
     project_level1_name: str | None = None
     project_level2_name: str | None = None
+
+    @model_validator(mode="after")
+    def validate_read_logic(self):
+        # 读取时，允许 punishment_option_id 为 None（惩罚选项可能已被删除）
+        # 已完成的任务必须提供评分
+        if self.status == TaskStatus.COMPLETED.value and not self.rating:
+            raise ValueError("已完成的任务必须提供评分")
+        
+        # reward_type=reward 时必须提供 reward_points
+        if self.reward_type == RewardType.REWARD.value and not self.reward_points:
+            reward_label = get_enum_label("reward_type", RewardType.REWARD.value)
+            raise ValueError(f"{reward_label}类型必须提供奖励积分")
+        
+        # reward_type=punish 时，允许 punishment_option_id 为 None（惩罚选项可能已被删除）
+        # 不验证 punishment_option_id 是否存在
+        
+        # reward_type=none 时不应有 reward_points 或 punishment_option_id
+        if self.reward_type == RewardType.NONE.value:
+            none_label = get_enum_label("reward_type", RewardType.NONE.value)
+            if self.reward_points:
+                raise ValueError(f"{none_label}类型不应有奖励积分")
+            if self.punishment_option_id:
+                raise ValueError(f"{none_label}类型不应有惩罚选项")
+        
+        return self
 
     class Config:
         from_attributes = True

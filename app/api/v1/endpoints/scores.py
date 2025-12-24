@@ -154,13 +154,13 @@ async def create_score_exchange(
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# 兑换奖励选项管理
+# 奖励选项管理
 @router.get("/reward-options", response_model=list[RewardExchangeOptionRead])
 async def get_reward_exchange_options(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """获取兑换奖励选项列表"""
+    """获取奖励选项列表"""
     options = await crud.get_reward_exchange_options(db, current_user.id)
     return options
 
@@ -171,7 +171,7 @@ async def create_reward_exchange_option(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """创建兑换奖励选项"""
+    """创建奖励选项"""
     return await crud.create_reward_exchange_option(db, option, current_user.id)
 
 
@@ -182,7 +182,7 @@ async def update_reward_exchange_option(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """更新兑换奖励选项"""
+    """更新奖励选项"""
     option = await crud.update_reward_exchange_option(db, option_id, option_update, current_user.id)
     if not option:
         raise HTTPException(status_code=404, detail="奖励选项不存在")
@@ -195,7 +195,7 @@ async def delete_reward_exchange_option(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """删除兑换奖励选项"""
+    """删除奖励选项"""
     success = await crud.delete_reward_exchange_option(db, option_id, current_user.id)
     if not success:
         raise HTTPException(status_code=404, detail="奖励选项不存在")

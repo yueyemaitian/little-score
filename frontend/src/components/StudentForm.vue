@@ -19,15 +19,6 @@
           @click="showGenderPicker = true"
         />
         <van-field
-          v-model="form.birthday"
-          readonly
-          label="出生年月"
-          placeholder="选择日期"
-          is-link
-          required
-          @click="showDatePicker = true"
-        />
-        <van-field
           :model-value="stageDisplayText"
           readonly
           label="教育阶段"
@@ -46,8 +37,8 @@
         <van-field
           v-model="form.enroll_date"
           readonly
-          label="入学时间"
-          placeholder="选择日期"
+          label="入学年月"
+          placeholder="选择年月"
           is-link
           @click="showEnrollDatePicker = true"
         />
@@ -73,18 +64,6 @@
       />
     </van-popup>
 
-    <!-- 日期选择器 -->
-    <van-popup v-model:show="showDatePicker" position="bottom" round>
-      <van-date-picker
-        v-model="currentDate"
-        title="选择出生日期"
-        :min-date="new Date(1990, 0, 1)"
-        :max-date="new Date()"
-        @confirm="onDateConfirm"
-        @cancel="showDatePicker = false"
-      />
-    </van-popup>
-
     <!-- 阶段选择器 -->
     <van-popup v-model:show="showStagePicker" position="bottom">
       <van-picker
@@ -96,11 +75,12 @@
       />
     </van-popup>
 
-    <!-- 入学日期选择器 -->
+    <!-- 入学年月选择器 -->
     <van-popup v-model:show="showEnrollDatePicker" position="bottom" round>
       <van-date-picker
         v-model="currentEnrollDate"
-        title="选择入学时间"
+        title="选择入学年月"
+        type="year-month"
         :min-date="new Date(2000, 0, 1)"
         :max-date="new Date()"
         @confirm="onEnrollDateConfirm"
@@ -130,21 +110,18 @@ const loading = ref(false)
 const form = ref({
   name: '',
   gender: null, // 初始值为 null，显示 placeholder
-  birthday: '',
   stage: null, // 初始值为 null，显示 placeholder
   school: '',
   enroll_date: ''
 })
 
 const showGenderPicker = ref(false)
-const showDatePicker = ref(false)
 const showStagePicker = ref(false)
 const showEnrollDatePicker = ref(false)
 
 const enumsStore = useEnumsStore()
 
-const currentDate = ref(['2020', '01', '01'])
-const currentEnrollDate = ref(['2020', '09', '01'])
+const currentEnrollDate = ref(['2020', '09'])
 
 // 从 store 获取枚举值
 const genderColumns = computed(() => enumsStore.gender)
@@ -228,17 +205,13 @@ const onGenderConfirm = ({ selectedOptions }) => {
   showGenderPicker.value = false
 }
 
-const onDateConfirm = ({ selectedValues }) => {
-  form.value.birthday = selectedValues.join('-')
-  showDatePicker.value = false
-}
-
 const onStageConfirm = ({ selectedOptions }) => {
   form.value.stage = selectedOptions[0].value
   showStagePicker.value = false
 }
 
 const onEnrollDateConfirm = ({ selectedValues }) => {
+  // 只保存年月，格式：YYYY-MM
   form.value.enroll_date = selectedValues.join('-')
   showEnrollDatePicker.value = false
 }
@@ -280,16 +253,14 @@ onMounted(() => {
     form.value = {
       name: props.student.name,
       gender: props.student.gender,
-      birthday: props.student.birthday,
       stage: props.student.stage,
       school: props.student.school || '',
       enroll_date: props.student.enroll_date || ''
     }
-    if (props.student.birthday) {
-      currentDate.value = props.student.birthday.split('-')
-    }
     if (props.student.enroll_date) {
-      currentEnrollDate.value = props.student.enroll_date.split('-')
+      // 如果已有日期，提取年月部分（格式：YYYY-MM 或 YYYY-MM-DD）
+      const dateParts = props.student.enroll_date.split('-')
+      currentEnrollDate.value = [dateParts[0], dateParts[1]]
     }
   } else {
     // 新增学生时，设置默认值为第一个选项的值（如果枚举已加载）

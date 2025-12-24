@@ -52,7 +52,7 @@ async def get_score_increases(
 
 
 async def get_reward_exchange_options(db: AsyncSession, user_id: int) -> list[RewardExchangeOption]:
-    """获取用户的兑换奖励选项"""
+    """获取用户的奖励选项"""
     result = await db.execute(
         select(RewardExchangeOption)
         .where(RewardExchangeOption.user_id == user_id)
@@ -64,7 +64,7 @@ async def get_reward_exchange_options(db: AsyncSession, user_id: int) -> list[Re
 async def get_reward_exchange_option_by_id(
     db: AsyncSession, option_id: int, user_id: int
 ) -> RewardExchangeOption | None:
-    """根据ID获取兑换奖励选项（确保属于当前用户）"""
+    """根据ID获取奖励选项（确保属于当前用户）"""
     result = await db.execute(
         select(RewardExchangeOption).where(
             RewardExchangeOption.id == option_id, RewardExchangeOption.user_id == user_id
@@ -76,7 +76,7 @@ async def get_reward_exchange_option_by_id(
 async def create_reward_exchange_option(
     db: AsyncSession, option: RewardExchangeOptionCreate, user_id: int
 ) -> RewardExchangeOption:
-    """创建兑换奖励选项"""
+    """创建奖励选项"""
     db_option = RewardExchangeOption(**option.model_dump(), user_id=user_id)
     db.add(db_option)
     await db.commit()
@@ -87,7 +87,7 @@ async def create_reward_exchange_option(
 async def update_reward_exchange_option(
     db: AsyncSession, option_id: int, option_update: RewardExchangeOptionUpdate, user_id: int
 ) -> RewardExchangeOption | None:
-    """更新兑换奖励选项"""
+    """更新奖励选项"""
     db_option = await get_reward_exchange_option_by_id(db, option_id, user_id)
     if not db_option:
         return None
@@ -102,10 +102,26 @@ async def update_reward_exchange_option(
 
 
 async def delete_reward_exchange_option(db: AsyncSession, option_id: int, user_id: int) -> bool:
-    """删除兑换奖励选项"""
+    """删除奖励选项"""
     db_option = await get_reward_exchange_option_by_id(db, option_id, user_id)
     if not db_option:
         return False
+
+    # 检查是否有兑换记录引用该奖励选项
+    from sqlalchemy import select
+    from app.models.task_and_score import ScoreExchange
+    
+    exchange_query = select(ScoreExchange).where(ScoreExchange.reward_option_id == option_id)
+    exchange_result = await db.execute(exchange_query)
+    exchanges = exchange_result.scalars().all()
+    
+    # 如果有引用，抛出异常
+    if exchanges:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=400,
+            detail=f"无法删除奖励选项：该选项已被 {len(exchanges)} 条兑换记录引用，请先删除相关兑换记录"
+        )
 
     await db.delete(db_option)
     await db.commit()
@@ -206,6 +222,22 @@ async def delete_punishment_option(db: AsyncSession, option_id: int, user_id: in
     db_option = await get_punishment_option_by_id(db, option_id, user_id)
     if not db_option:
         return False
+
+    # 检查是否有任务引用该惩罚选项
+    from sqlalchemy import select
+    from app.models.task_and_score import Task
+    
+    task_query = select(Task).where(Task.punishment_option_id == option_id)
+    task_result = await db.execute(task_query)
+    tasks = task_result.scalars().all()
+    
+    # 如果有引用，抛出异常
+    if tasks:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=400,
+            detail=f"无法删除惩罚选项：该选项已被 {len(tasks)} 条任务记录引用，请先删除相关任务"
+        )
 
     await db.delete(db_option)
     await db.commit()
