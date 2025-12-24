@@ -13,8 +13,9 @@ async def get_tasks(
     student_id: int,
     project_level1_id: int | None = None,
     project_level2_id: int | None = None,
-    status: str | None = None,
+    status: list[str] | str | None = None,
     include_all_status: bool = False,
+    completed_after: datetime | None = None,
 ) -> list[Task]:
     """获取任务列表（默认只返回未开始和进行中的，排除已删除的）"""
     query = select(Task).where(
@@ -26,8 +27,21 @@ async def get_tasks(
         query = query.where(Task.project_level1_id == project_level1_id)
     if project_level2_id is not None:
         query = query.where(Task.project_level2_id == project_level2_id)
-    if status is not None:
-        query = query.where(Task.status == status)
+    # 完成时间过滤：如果指定了 completed_after，只返回在该时间之后完成的任务
+    # 注意：completed_after 过滤会覆盖默认的状态过滤
+    if completed_after is not None:
+        query = query.where(
+            Task.status == TaskStatus.COMPLETED,
+            Task.updated_at >= completed_after
+        )
+    elif status is not None:
+        # 支持多个状态筛选
+        if isinstance(status, list):
+            if len(status) > 0:
+                query = query.where(Task.status.in_(status))
+        else:
+            # 兼容单个状态（字符串）
+            query = query.where(Task.status == status)
     elif not include_all_status:
         # 默认只显示未开始和进行中的
         query = query.where(Task.status.in_([TaskStatus.NOT_STARTED, TaskStatus.IN_PROGRESS]))

@@ -8,7 +8,7 @@
   >
     <van-tabbar-item icon="home-o" to="/">首页</van-tabbar-item>
     <van-tabbar-item icon="orders-o" to="/tasks">任务</van-tabbar-item>
-    <van-tabbar-item icon="gold-coin-o" to="/scores">积分</van-tabbar-item>
+    <van-tabbar-item icon="gift-o" to="/scores">商城</van-tabbar-item>
     <van-tabbar-item icon="user-o" to="/profile">我的</van-tabbar-item>
   </van-tabbar>
 </template>
@@ -52,6 +52,7 @@ onMounted(() => {
 .app-tabbar {
   border-top: 1px solid #e5e7eb;
   background-color: #ffffff;
+  flex-shrink: 0; /* 确保底部导航不会被压缩 */
 }
 </style>
 

@@ -3,10 +3,7 @@
     <!-- 顶部 App 头部（点击可选择/新增孩子） -->
     <div class="home-header" @click="openStudentPicker">
       <div class="header-left">
-        <div class="header-avatar">
-          <span v-if="student" class="header-avatar-text">
-            {{ (student.name || '').charAt(0) || '学' }}
-          </span>
+        <div class="header-avatar" :style="{ backgroundImage: `url(${getAvatarUrl()})` }">
         </div>
         <div class="header-info" v-if="student">
           <div class="header-name">{{ student.name }}</div>
@@ -14,9 +11,14 @@
             {{ student.school || '年级未设置' }} · Lv.1
           </div>
         </div>
+        <van-icon name="arrow-down" class="header-arrow" />
       </div>
-      <div class="header-right">
-        <van-icon name="bell" class="header-icon" />
+      <div class="header-right" @click.stop>
+        <div class="header-icon-wrapper">
+          <slot name="right-icon">
+            <van-icon name="bell" class="header-icon" />
+          </slot>
+        </div>
       </div>
     </div>
 
@@ -51,7 +53,24 @@ const emit = defineEmits(['switch', 'add'])
 const router = useRouter()
 const showPicker = ref(false)
 
-// 孩子选择下拉选项：所有孩子 + “＋ 添加孩子”
+// 根据性别返回头像文件路径
+const getAvatarUrl = () => {
+  if (!props.student || !props.student.gender) {
+    return '/avatar-default-40x40.png' // 默认头像
+  }
+  
+  if (props.student.gender === 'male') {
+    return '/avatar-boy-40x40.png' // 男孩头像
+  }
+  
+  if (props.student.gender === 'female') {
+    return '/avatar-girl-40x40.png' // 女孩头像
+  }
+  
+  return '/avatar-default-40x40.png'
+}
+
+// 孩子选择下拉选项：所有孩子 + "＋ 添加孩子"
 const studentColumns = computed(() => {
   const base = props.allStudents.map((item) => ({
     text: item.name,
@@ -113,22 +132,20 @@ const onConfirm = ({ selectedOptions }) => {
   width: 40px;
   height: 40px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #ffcc80, #ffb74d);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.header-avatar-text {
-  transform: translateY(1px);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .header-info {
   display: flex;
   flex-direction: column;
+}
+
+.header-arrow {
+  font-size: 14px;
+  color: #9ca3af;
+  margin-left: 4px;
 }
 
 .header-name {
@@ -140,12 +157,27 @@ const onConfirm = ({ selectedOptions }) => {
 .header-meta {
   margin-top: 2px;
   font-size: 12px;
-  color: #9ca3af;
+  color: #6b7280;
 }
 
 .header-right {
   display: flex;
   align-items: center;
+  position: relative;
+  /* 扩展点击区域到整个header区域的1/10 */
+  flex: 0 0 10%;
+  justify-content: flex-start;
+  min-height: 100%;
+}
+
+.header-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  height: 100%;
+  padding-left: 8px;
+  cursor: pointer;
 }
 
 .header-icon {

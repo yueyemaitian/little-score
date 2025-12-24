@@ -3,10 +3,7 @@
     <!-- 顶部 App 头部（点击可选择/新增孩子） -->
     <div class="home-header" @click="openStudentPicker">
       <div class="header-left">
-        <div class="header-avatar">
-          <span v-if="currentStudent" class="header-avatar-text">
-            {{ (currentStudent.student.name || '').charAt(0) || '学' }}
-          </span>
+        <div class="header-avatar" :style="{ backgroundImage: `url(${getAvatarUrl()})` }">
         </div>
         <div class="header-info" v-if="currentStudent">
           <div class="header-name">{{ currentStudent.student.name }}</div>
@@ -49,24 +46,12 @@
             <div class="points-value">
               {{ currentStudent.score_summary.available_points }}
             </div>
-            <div
-              class="points-exchanged"
-              @click.stop="handleExchangedPointsClick(currentStudent.student.id)"
-            >
+            <div class="points-exchanged">
               累计兑换：{{ currentStudent.score_summary.exchanged_points }}
             </div>
           </div>
           <div class="points-action">
-            <div class="points-icon"></div>
-            <van-button
-              type="primary"
-              size="small"
-              round
-              class="points-button"
-              @click="handleAvailablePointsClick(currentStudent.student.id)"
-            >
-              去兑换 &gt;
-            </van-button>
+            <div class="points-icon">￥</div>
           </div>
         </div>
 
@@ -76,20 +61,24 @@
             class="quick-card"
             @click="handleQuickAddTask(currentStudent.student.id)"
           >
-            <div class="quick-icon pen"></div>
+            <div class="quick-icon pen">
+              <van-icon name="edit" />
+              </div>
             <div class="quick-text">记一笔</div>
-          </div>
+              </div>
           <div
             class="quick-card"
             @click="handleAvailablePointsClick(currentStudent.student.id)"
           >
-            <div class="quick-icon gift"></div>
+            <div class="quick-icon gift">
+              <van-icon name="gift-o" />
+            </div>
             <div class="quick-text">换奖励</div>
+            </div>
           </div>
-        </div>
 
         <!-- 最近一周动态 -->
-        <div class="student-section">
+          <div class="student-section">
           <div class="section-title-row">
             <div class="section-title">最近一周动态</div>
           </div>
@@ -98,22 +87,33 @@
           </div>
           <div v-else class="activity-list">
             <div
-              v-for="item in activities"
+              v-for="(item, index) in activities"
               :key="item.key"
               class="activity-item"
+              :class="{ 'activity-item-latest': index === 0 }"
             >
               <div class="activity-left">
                 <span
                   class="activity-dot"
-                  :class="item.type === 'increase' ? 'activity-dot-increase' : 'activity-dot-exchange'"
-                />
+                  :class="[
+                    item.type === 'increase' ? 'activity-dot-increase' : 'activity-dot-exchange',
+                    { 'activity-dot-latest': index === 0 }
+                  ]"
+                >
+                  <van-icon v-if="index === 0" name="success" class="activity-dot-check" />
+                </span>
                 <div class="activity-text">
-                  <div class="activity-title">{{ item.title }}</div>
+                  <div 
+                    class="activity-title"
+                    :class="index === 0 ? (item.type === 'increase' ? 'activity-title-latest-increase' : 'activity-title-latest-exchange') : ''"
+                  >
+                    {{ item.title }}
+                  </div>
                   <div class="activity-time">
                     {{ formatTime(item.created_at) }}
                   </div>
                 </div>
-              </div>
+            </div>
               <div
                 class="activity-amount"
                 :class="item.type === 'increase' ? 'activity-amount-plus' : 'activity-amount-minus'"
@@ -156,7 +156,24 @@ const currentStudent = computed(() => {
   return found || students.value[0]
 })
 
-// 孩子选择下拉选项：所有孩子 + “＋ 添加孩子”
+// 根据性别返回头像文件路径
+const getAvatarUrl = () => {
+  if (!currentStudent.value || !currentStudent.value.student.gender) {
+    return '/avatar-default-40x40.png' // 默认头像
+  }
+  
+  if (currentStudent.value.student.gender === 'male') {
+    return '/avatar-boy-40x40.png' // 男孩头像
+  }
+  
+  if (currentStudent.value.student.gender === 'female') {
+    return '/avatar-girl-40x40.png' // 女孩头像
+  }
+  
+  return '/avatar-default-40x40.png'
+}
+
+// 孩子选择下拉选项：所有孩子 + "＋ 添加孩子"
 const studentColumns = computed(() => {
   const base = students.value.map((item) => ({
     text: item.student.name,
@@ -325,7 +342,7 @@ onMounted(() => {
 <style scoped>
 .home-container {
   width: 100%;
-  min-height: 100vh;
+  min-height: 60vh;
   background: #f4f5f7;
 }
 
@@ -349,17 +366,9 @@ onMounted(() => {
   width: 40px;
   height: 40px;
   border-radius: 999px;
-  background: linear-gradient(135deg, #ffcc80, #ffb74d);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.header-avatar-text {
-  transform: translateY(1px);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 .header-info {
@@ -382,7 +391,7 @@ onMounted(() => {
 .header-meta {
   margin-top: 2px;
   font-size: 12px;
-  color: #9ca3af;
+  color: #6b7280;
 }
 
 .header-right {
@@ -396,7 +405,7 @@ onMounted(() => {
 }
 
 .home-scroll {
-  padding: 8px 8px 72px; /* 收紧左右边距，为底部 TabBar 预留空间 */
+  padding: 8px 8px 8px; /* 收紧左右边距，为底部 TabBar 预留空间 */
   box-sizing: border-box;
 }
 
@@ -407,69 +416,88 @@ onMounted(() => {
 .points-card {
   margin-top: 4px;
   border-radius: 20px;
-  padding: 18px 18px 16px;
-  background: linear-gradient(135deg, #ffb74d, #ffa726);
+  padding: 14px 16px;
+  height: 150px;
+  background: linear-gradient(135deg, #ffb74d 0%, #ffa726 25%, #ff9800 50%, #fb8c00 75%, #f57c00 100%);
   color: #fff;
   display: flex;
   justify-content: space-between;
   align-items: stretch;
-  box-shadow: 0 10px 30px rgba(255, 167, 38, 0.4);
+  box-shadow: 0 10px 30px rgba(255, 167, 38, 0.4),
+              0 4px 15px rgba(255, 152, 0, 0.3);
+  position: relative;
+  overflow: hidden;
 }
 
 .points-main {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 }
 
 .points-label {
   font-size: 13px;
   opacity: 0.9;
+  font-weight: 500;
 }
 
 .points-value {
-  font-size: 32px;
+  font-size: 60px;
   font-weight: 700;
+  height: 64px;
   letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
 }
 
 .points-exchanged {
-  margin-top: 4px;
+  margin-top: 2px;
   display: inline-flex;
   align-items: center;
   padding: 4px 10px;
+  font-weight: 500;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.2);
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.points-exchanged:active {
-  background: rgba(255, 255, 255, 0.3);
+  font-size: 13px;
 }
 
 .points-action {
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: flex-end;
 }
 
 .points-icon {
-  width: 54px;
-  height: 54px;
+  position: absolute;
+  right: -20px;
+  bottom: -20px;
+  width: 120px;
+  height: 120px;
   border-radius: 999px;
-  background: radial-gradient(circle at 30% 30%, #fff3e0, #ffb74d);
-  opacity: 0.9;
+  background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.4), rgba(255, 183, 77, 0.3));
+  opacity: 0.6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 72px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+  transform: rotate(15deg);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 0;
 }
 
 .points-button {
-  margin-top: 12px;
+  margin-top: 0;
   border: none;
   background: #ffffff;
   color: #ff9800;
   font-weight: 500;
   padding: 0 14px;
+  position: relative;
+  z-index: 1;
 }
 
 .points-button :deep(.van-button__text) {
@@ -516,11 +544,11 @@ onMounted(() => {
 }
 
 .quick-icon.gift {
-  background: linear-gradient(135deg, #ffca28, #ffb300);
+  background: linear-gradient(135deg, #ab47bc, #8e24aa);
 }
 
 .quick-text {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 500;
   color: #111827;
 }
@@ -541,7 +569,7 @@ onMounted(() => {
 }
 
 .section-title {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   color: #111827;
 }
@@ -553,26 +581,82 @@ onMounted(() => {
 .activity-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 4px;
+  margin-left: 16px;
+  margin-right: 16px;
 }
 
 .activity-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-top: 8px;
+  position: relative;
+  padding-bottom: 8px;
+}
+
+.activity-item:last-child {
+  padding-bottom: 0;
+}
+
+.activity-item:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 16px; /* activity-dot(8px) + gap(8px) = activity-text 开始位置 */
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: #e5e7eb;
+  margin-right: 0;
 }
 
 .activity-left {
   display: flex;
   align-items: flex-start;
   gap: 8px;
+  position: relative;
 }
 
 .activity-dot {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
   border-radius: 999px;
   margin-top: 6px;
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.activity-dot-latest {
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
+  margin-left: -2px; /* 向左偏移 2px，使中心与普通 dot 对齐 (10px/2 - 6px/2 = 2px) */
+}
+
+.activity-dot-check {
+  font-size: 6px;
+  color: #ffffff;
+}
+
+.activity-item:not(:last-child) .activity-left::after {
+  content: '';
+  position: absolute;
+  left: 2.5px; /* activity-dot 的中心位置 (6px / 2 - 0.5px) */
+  top: 12px; /* activity-dot 的底部 (6px margin-top + 6px height) */
+  width: 1px;
+  bottom: -26px; /* 延伸到下一个 item 的 dot 顶部: padding-bottom(8px) + margin-top(8px) + dot margin-top(6px) = 22px */
+  background: #e5e7eb;
+  z-index: 0;
+}
+
+.activity-item-latest .activity-left::after {
+  left: 2.5px; /* 与普通 dot 中心对齐 */
+  top: 14px; /* 最新 dot 的底部 (4px margin-top + 10px height) */
+  bottom: -22px; /* 延伸到下一个 item 的 dot 顶部 */
 }
 
 .activity-dot-increase {
@@ -580,18 +664,27 @@ onMounted(() => {
 }
 
 .activity-dot-exchange {
-  background: #c4c4c4;
+  background: #ba68c8;
 }
 
 .activity-text {
   display: flex;
   flex-direction: column;
+  flex: 1;
 }
 
 .activity-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 500;
-  color: #111827;
+  color: #46494f;
+}
+
+.activity-title-latest-increase {
+  color: #4a90e2;
+}
+
+.activity-title-latest-exchange {
+  color: #ba68c8;
 }
 
 .activity-time {
@@ -606,11 +699,11 @@ onMounted(() => {
 }
 
 .activity-amount-plus {
-  color: #ffb300;
+  color: #4a90e2;
 }
 
 .activity-amount-minus {
-  color: #f43f5e;
+  color: #ba68c8;
 }
 
 .empty-state {

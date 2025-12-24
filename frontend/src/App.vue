@@ -50,13 +50,16 @@ body {
   background-color: #e5e7eb;
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   min-height: 100vh;
+  min-height: 100dvh; /* 使用动态视口高度，适配移动浏览器 */
   margin: 0;
+  padding: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
     Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
 .app-root {
@@ -69,6 +72,7 @@ body {
   width: 100%;
   max-width: 420px;
   height: 100vh;
+  height: 100dvh; /* 使用动态视口高度，适配移动浏览器 */
   max-height: 900px;
   background: #f9fafb;
   position: relative;
@@ -81,8 +85,9 @@ body {
 @media (min-width: 450px) {
   .app-shell {
     height: 90vh;
+    margin-top: 40px;
     border-radius: 20px;
-    border: 8px solid #fff;
+    border: 12px solid #fff;
   }
 }
 
@@ -91,9 +96,11 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding-bottom: 72px; /* 预留底部导航高度，避免内容被遮挡 */
+  padding-bottom: 2px; /* 预留底部导航高度（约50px），避免内容被遮挡 */
   position: relative;
   margin: 0 1px;
+  min-height: 0; /* 确保 flex 子元素可以正确收缩 */
+  box-sizing: border-box; /* 确保 padding 包含在总高度内 */
 }
 
 .page-content::-webkit-scrollbar {

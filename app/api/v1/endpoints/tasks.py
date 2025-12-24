@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -17,8 +18,9 @@ async def get_tasks(
     student_id: Annotated[int, Query(description="学生ID")],
     project_level1_id: Annotated[int | None, Query(description="一级项目ID")] = None,
     project_level2_id: Annotated[int | None, Query(description="二级项目ID")] = None,
-    status: Annotated[str | None, Query(description="状态")] = None,
+    status: Annotated[list[str] | None, Query(description="状态（支持多选）")] = None,
     include_all_status: Annotated[bool, Query(description="是否包含所有状态", example=False)] = False,
+    completed_after: Annotated[datetime | None, Query(description="完成时间（在此时间之后完成的任务）")] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -37,6 +39,7 @@ async def get_tasks(
         project_level2_id=project_level2_id,
         status=status,
         include_all_status=include_all_status,
+        completed_after=completed_after,
     )
     return tasks
 
