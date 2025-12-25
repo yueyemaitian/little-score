@@ -203,7 +203,28 @@ async def get_my_accounts(
 ) -> list[UserAccountRead]:
     """获取当前用户的所有关联账号"""
     accounts = await get_user_accounts_by_user_id(db, current_user.id)
-    return [UserAccountRead.model_validate(account) for account in accounts]
+    result = [UserAccountRead.model_validate(account) for account in accounts]
+    
+    # 如果用户有邮箱，但没有邮箱账号记录，添加一个虚拟的邮箱账号记录
+    if current_user.email:
+        has_email_account = any(acc.account_type == "email" for acc in accounts)
+        if not has_email_account:
+            # 创建一个虚拟的邮箱账号记录（不保存到数据库，仅用于前端显示）
+            # User 模型没有 updated_at 字段，使用 created_at 作为 updated_at
+            email_account = UserAccountRead(
+                id=0,  # 虚拟ID，表示这不是数据库中的记录
+                user_id=current_user.id,
+                account_type="email",
+                account_id=current_user.email,
+                account_name=current_user.email,
+                avatar_url=None,
+                extra_data=None,
+                created_at=current_user.created_at,
+                updated_at=current_user.created_at,  # User 模型没有 updated_at，使用 created_at
+            )
+            result.append(email_account)
+    
+    return result
 
 
 @router.post("/accounts/bind", response_model=UserAccountRead)

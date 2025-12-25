@@ -46,7 +46,8 @@ async def get_wechat_user_info(code: str) -> dict:
                 detail="获取微信access_token失败"
             )
         
-        # 第二步：通过access_token获取用户信息
+        # 第二步：尝试通过access_token获取用户信息
+        # 注意：如果使用的是 snsapi_base scope，可能无法获取用户详细信息
         user_info_url = "https://api.weixin.qq.com/sns/userinfo"
         user_info_params = {
             "access_token": access_token,
@@ -57,11 +58,25 @@ async def get_wechat_user_info(code: str) -> dict:
         user_info_response = await client.get(user_info_url, params=user_info_params)
         user_info = user_info_response.json()
         
+        # 如果获取用户信息失败（可能是 snsapi_base scope），只返回 openid
         if "errcode" in user_info:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"获取微信用户信息失败: {user_info.get('errmsg', '未知错误')}"
-            )
+            errcode = user_info.get("errcode")
+            errmsg = user_info.get("errmsg", "未知错误")
+            
+            # 如果是 scope 权限不足（40001, 40003），只返回 openid
+            if errcode in [40001, 40003]:
+                return {
+                    "openid": openid,
+                    "nickname": "",
+                    "headimgurl": "",
+                    "unionid": None,
+                    "extra_data": json.dumps({})
+                }
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"获取微信用户信息失败: {errmsg} (错误码: {errcode})"
+                )
         
         return {
             "openid": openid,

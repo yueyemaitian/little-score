@@ -264,7 +264,9 @@ const handleWechatLogin = async () => {
           console.log('微信授权跳转:', { appId, baseUrl, redirectUri })
           
           // 跳转到微信授权页面
-          const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_userinfo&state=${state}#wechat_redirect`
+          // 先尝试使用 snsapi_base（静默授权，适用于企业微信和个人微信）
+          // 如果需要用户信息，后端可以通过 access_token 获取
+          const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_base&state=${state}#wechat_redirect`
           window.location.href = authUrl
         } catch (error) {
           console.error('获取微信 AppID 失败:', error)
@@ -290,7 +292,9 @@ const handleWechatLogin = async () => {
           const state = 'wechat_login_' + Date.now()
           
           // 构建授权URL
-          wechatAuthUrl.value = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_userinfo&state=${state}#wechat_redirect`
+          // 先尝试使用 snsapi_base（静默授权，适用于企业微信和个人微信）
+          // 如果需要用户信息，后端可以通过 access_token 获取
+          wechatAuthUrl.value = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_base&state=${state}#wechat_redirect`
           
           // 显示弹窗
           showWechatLoginDialog.value = true

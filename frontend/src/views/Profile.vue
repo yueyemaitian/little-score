@@ -27,7 +27,7 @@
               :key="account.id"
               :title="getAccountTypeName(account.account_type)"
               :label="account.account_name || account.account_id"
-              :value="account.account_type === 'email' ? '已绑定' : '已绑定'"
+              :value="isCurrentLoginAccount(account) ? '当前登录' : '已绑定'"
             >
               <template #icon>
                 <van-icon :name="getAccountIcon(account.account_type)" style="margin-right: 8px;" />
@@ -35,7 +35,8 @@
             </van-cell>
           </van-cell-group>
           
-          <div class="bind-account-section">
+          <!-- 只有存在未绑定的账号类型时才显示"绑定账号"部分 -->
+          <div class="bind-account-section" v-if="hasUnboundAccounts">
             <div class="section-title">绑定账号</div>
             <van-cell-group inset style="margin: 12px;">
               <van-cell
@@ -477,7 +478,13 @@ const handleLogout = async () => {
       message: '确定要退出登录吗？'
     })
     authStore.logout()
-    router.push('/login')
+    // 在微信浏览器中，使用 window.location.href 强制跳转
+    const browserType = getBrowserType()
+    if (browserType === 'wechat' || browserType === 'dingtalk') {
+      window.location.href = '/login'
+    } else {
+      router.push('/login')
+    }
   } catch {
     // 用户取消
   }
@@ -581,6 +588,30 @@ const hasAccountType = (type) => {
   return accounts.value.some(account => account.account_type === type)
 }
 
+// 检查是否有未绑定的账号类型
+const hasUnboundAccounts = computed(() => {
+  return !hasAccountType('wechat') || !hasAccountType('dingtalk') || !hasAccountType('email')
+})
+
+// 判断是否是当前登录账号
+const isCurrentLoginAccount = (account) => {
+  // 如果是邮箱账号，检查是否与当前用户邮箱匹配
+  if (account.account_type === 'email' && authStore.user?.email) {
+    return account.account_id === authStore.user.email
+  }
+  // 对于微信和钉钉，如果只有一个账号，通常就是当前登录账号
+  // 或者可以通过其他方式判断（比如检查是否是最近登录的账号）
+  // 这里简化处理：如果账号类型与当前浏览器环境匹配，可能是当前登录账号
+  const browserType = getBrowserType()
+  if (account.account_type === 'wechat' && browserType === 'wechat') {
+    return true
+  }
+  if (account.account_type === 'dingtalk' && browserType === 'dingtalk') {
+    return true
+  }
+  return false
+}
+
 // 获取账号列表
 const fetchAccounts = async () => {
   loadingAccounts.value = true
@@ -596,6 +627,15 @@ const fetchAccounts = async () => {
 
 // 绑定邮箱
 const handleBindEmail = async () => {
+  // 如果用户已经有邮箱账号（包括虚拟的），提示用户
+  if (hasAccountType('email')) {
+    const emailAccount = accounts.value.find(acc => acc.account_type === 'email')
+    if (emailAccount) {
+      showFailToast(`您已绑定邮箱账号：${emailAccount.account_id}`)
+      return
+    }
+  }
+  
   if (bindEmailForm.value.password.length < 6 || bindEmailForm.value.password.length > 20) {
     showFailToast('密码长度必须在6-20位之间')
     return
@@ -654,7 +694,9 @@ const startWechatBindFlow = async () => {
     console.log('微信绑定授权跳转:', { appId, baseUrl, redirectUri })
     
     // 跳转到微信授权页面
-    const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_userinfo&state=${state}#wechat_redirect`
+    // 先尝试使用 snsapi_base（静默授权，适用于企业微信和个人微信）
+    // 如果需要用户信息，后端可以通过 access_token 获取
+    const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_base&state=${state}#wechat_redirect`
     window.location.href = authUrl
   } catch (error) {
     console.error('获取微信 AppID 失败:', error)
@@ -683,7 +725,9 @@ const showWechatBindOptions = async () => {
     const state = 'bind_wechat_' + Date.now()
     
     // 构建授权URL
-    wechatBindAuthUrl.value = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_userinfo&state=${state}#wechat_redirect`
+    // 先尝试使用 snsapi_base（静默授权，适用于企业微信和个人微信）
+    // 如果需要用户信息，后端可以通过 access_token 获取
+    wechatBindAuthUrl.value = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_base&state=${state}#wechat_redirect`
     
     // 显示绑定选项弹窗
     showBindWechatDialog.value = true
