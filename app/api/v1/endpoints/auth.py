@@ -262,14 +262,35 @@ async def bind_account(
 
 @router.get("/wechat/app-id")
 async def get_wechat_app_id():
-    """获取微信 AppID（用于前端授权跳转）"""
+    """获取微信 AppID 和授权回调基础URL（用于前端授权跳转）"""
     settings = get_settings()
     if not settings.WECHAT_APP_ID:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="微信 AppID 未配置"
         )
-    return {"appId": settings.WECHAT_APP_ID}
+    return {
+        "appId": settings.WECHAT_APP_ID,
+        "redirectBaseUrl": settings.WECHAT_REDIRECT_BASE_URL  # 如果配置了，使用配置的；否则前端使用当前域名
+    }
+
+
+@router.get("/wechat/user-info")
+async def get_wechat_user_info_endpoint(
+    code: str,
+    current_user: User = Depends(get_current_active_user),
+):
+    """通过微信授权码获取用户信息（用于账号绑定）"""
+    try:
+        wechat_info = await get_wechat_user_info(code)
+        return wechat_info
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"获取微信用户信息失败: {str(e)}"
+        )
 
 
 @router.get("/wechat/jssdk-config")

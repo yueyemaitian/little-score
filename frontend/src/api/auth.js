@@ -38,6 +38,9 @@ export const authApi = {
   },
   getWechatAppId() {
     return api.get('/auth/wechat/app-id')
+  },
+  getWechatUserInfo(code) {
+    return api.get('/auth/wechat/user-info', { params: { code } })
   }
 }
 

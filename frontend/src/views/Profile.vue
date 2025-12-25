@@ -42,7 +42,7 @@
                 v-if="!hasAccountType('wechat')"
                 title="微信"
                 is-link
-                @click="showBindWechat = true"
+                @click="handleBindWechat"
               >
                 <template #icon>
                   <van-icon name="wechat" style="margin-right: 8px;" />
@@ -106,6 +106,75 @@
           </van-button>
         </div>
       </van-form>
+    </van-popup>
+
+    <!-- 绑定微信弹窗（非微信浏览器） -->
+    <van-popup
+      v-model:show="showBindWechatDialog"
+      position="center"
+      round
+      :style="{ width: '90%', maxWidth: '400px', padding: '20px' }"
+      closeable
+    >
+      <div class="wechat-bind-dialog">
+        <div class="dialog-title">绑定微信</div>
+        <div class="dialog-tips">请使用微信扫码或打开链接完成绑定</div>
+        
+        <!-- 二维码 -->
+        <div class="qr-code-container" v-if="wechatBindAuthUrl">
+          <canvas ref="wechatBindQrCodeCanvas" class="qr-code-canvas"></canvas>
+        </div>
+        
+        <!-- 操作按钮 -->
+        <div class="dialog-actions">
+          <van-button
+            type="primary"
+            block
+            round
+            @click="openWechatClientForBind"
+            style="margin-bottom: 10px;"
+          >
+            打开微信客户端
+          </van-button>
+          <van-button
+            plain
+            block
+            round
+            @click="copyBindAuthUrl"
+          >
+            复制链接
+          </van-button>
+        </div>
+      </div>
+    </van-popup>
+
+    <!-- 绑定钉钉弹窗 -->
+    <van-popup v-model:show="showBindDingtalk" position="bottom" :style="{ height: '60%' }">
+      <van-nav-bar
+        title="绑定钉钉"
+        left-arrow
+        @click-left="showBindDingtalk = false"
+      />
+      <div style="padding: 20px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <van-icon name="dingtalk" size="60" color="#007fff" />
+          <div style="margin-top: 16px; font-size: 16px; color: #323233;">
+            绑定钉钉账号
+          </div>
+          <div style="margin-top: 8px; font-size: 14px; color: #969799;">
+            绑定后可以使用钉钉快速登录
+          </div>
+        </div>
+        <van-button
+          type="primary"
+          block
+          round
+          @click="handleBindDingtalk"
+          :loading="binding"
+        >
+          开始绑定
+        </van-button>
+      </div>
     </van-popup>
 
     <!-- 学生管理列表 -->
@@ -237,7 +306,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { showConfirmDialog, showSuccessToast, showFailToast } from 'vant'
 import { useAuthStore } from '../stores/auth'
@@ -280,6 +349,9 @@ const loadingAccounts = ref(false)
 const accounts = ref([])
 const showBindEmail = ref(false)
 const showBindWechat = ref(false)
+const showBindWechatDialog = ref(false) // 非微信浏览器的绑定弹窗
+const wechatBindAuthUrl = ref('')
+const wechatBindQrCodeCanvas = ref(null)
 const showBindDingtalk = ref(false)
 const binding = ref(false)
 const bindEmailForm = ref({
@@ -412,8 +484,11 @@ const handleLogout = async () => {
 }
 
 // 处理 URL 参数
-const handleRouteAction = () => {
+const handleRouteAction = async () => {
   const action = route.query.action
+  const code = route.query.code
+  const state = route.query.state
+  
   if (action === 'add-student') {
     // 打开学生管理列表
     showStudentList.value = true
@@ -422,13 +497,64 @@ const handleRouteAction = () => {
     editingStudent.value = null
     // 清除 URL 参数
     router.replace({ path: '/profile', query: {} })
+  } else if (action === 'bind-wechat' && code) {
+    // 处理微信绑定回调
+    await handleWechatBindCallback(code, state)
+  } else if (action === 'bind-dingtalk' && code) {
+    // 处理钉钉绑定回调
+    await handleDingtalkBindCallback(code, state)
+  }
+}
+
+// 处理微信绑定回调
+const handleWechatBindCallback = async (code, state) => {
+  binding.value = true
+  try {
+    // 通过 code 获取微信用户信息
+    const wechatInfo = await authApi.getWechatUserInfo(code)
+    
+    // 绑定账号
+    await authApi.bindAccount({
+      account_type: 'wechat',
+      account_id: wechatInfo.openid,
+      account_name: wechatInfo.nickname,
+      avatar_url: wechatInfo.headimgurl,
+      extra_data: wechatInfo.extra_data
+    })
+    
+    showSuccessToast('微信绑定成功')
+    // 清除 URL 参数
+    router.replace({ path: '/profile', query: {} })
+    // 刷新账号列表
+    await fetchAccounts()
+  } catch (error) {
+    console.error('微信绑定失败:', error)
+    const message = extractErrorMessage(error)
+    showFailToast(message || '微信绑定失败')
+  } finally {
+    binding.value = false
+  }
+}
+
+// 处理钉钉绑定回调
+const handleDingtalkBindCallback = async (code, state) => {
+  binding.value = true
+  try {
+    // 类似微信绑定，需要调用后端接口
+    showFailToast('钉钉绑定功能开发中')
+  } catch (error) {
+    console.error('钉钉绑定失败:', error)
+    const message = extractErrorMessage(error)
+    showFailToast(message || '钉钉绑定失败')
+  } finally {
+    binding.value = false
   }
 }
 
 // 监听路由变化
-watch(() => route.query.action, () => {
+watch(() => route.query, () => {
   handleRouteAction()
-})
+}, { immediate: false })
 
 // 获取账号类型名称
 const getAccountTypeName = (type) => {
@@ -497,13 +623,167 @@ const handleBindEmail = async () => {
 // 绑定微信
 const handleBindWechat = async () => {
   const browserType = getBrowserType()
-  if (browserType !== 'wechat') {
-    showFailToast('请在微信浏览器中绑定')
+  
+  // 如果在微信浏览器中，直接走绑定流程
+  if (browserType === 'wechat') {
+    await startWechatBindFlow()
+  } else {
+    // 如果不在微信浏览器中，显示弹窗提供选项
+    await showWechatBindOptions()
+  }
+}
+
+// 开始微信绑定流程（在微信浏览器中）
+const startWechatBindFlow = async () => {
+  binding.value = true
+  try {
+    // 从后端获取 AppID 和授权回调基础URL
+    const appIdResponse = await authApi.getWechatAppId()
+    const appId = appIdResponse.appId
+    
+    if (!appId) {
+      showFailToast('微信登录功能需要配置微信AppID，请联系管理员')
+      return
+    }
+    
+    // 构建授权回调 URL
+    const baseUrl = appIdResponse.redirectBaseUrl || window.location.origin
+    const redirectUri = encodeURIComponent(baseUrl + '/profile?action=bind-wechat')
+    const state = 'bind_wechat_' + Date.now()
+    
+    console.log('微信绑定授权跳转:', { appId, baseUrl, redirectUri })
+    
+    // 跳转到微信授权页面
+    const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_userinfo&state=${state}#wechat_redirect`
+    window.location.href = authUrl
+  } catch (error) {
+    console.error('获取微信 AppID 失败:', error)
+    const message = extractErrorMessage(error)
+    showFailToast(message || '微信绑定功能需要配置微信AppID，请联系管理员')
+  } finally {
+    binding.value = false
+  }
+}
+
+// 显示微信绑定选项（非微信浏览器）
+const showWechatBindOptions = async () => {
+  try {
+    // 从后端获取 AppID 和授权回调基础URL
+    const appIdResponse = await authApi.getWechatAppId()
+    const appId = appIdResponse.appId
+    
+    if (!appId) {
+      showFailToast('微信登录功能需要配置微信AppID，请联系管理员')
+      return
+    }
+    
+    // 构建授权回调 URL
+    const baseUrl = appIdResponse.redirectBaseUrl || window.location.origin
+    const redirectUri = encodeURIComponent(baseUrl + '/profile?action=bind-wechat')
+    const state = 'bind_wechat_' + Date.now()
+    
+    // 构建授权URL
+    wechatBindAuthUrl.value = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_userinfo&state=${state}#wechat_redirect`
+    
+    // 显示绑定选项弹窗
+    showBindWechatDialog.value = true
+    
+    // 生成二维码
+    nextTick(() => {
+      generateBindQRCode(wechatBindAuthUrl.value)
+    })
+  } catch (error) {
+    console.error('获取微信 AppID 失败:', error)
+    const message = extractErrorMessage(error)
+    showFailToast(message || '微信绑定功能需要配置微信AppID，请联系管理员')
+  }
+}
+
+// 生成绑定二维码
+const generateBindQRCode = (url) => {
+  if (!wechatBindQrCodeCanvas.value) return
+  
+  const size = 200
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}`
+  
+  const img = new Image()
+  img.crossOrigin = 'anonymous'
+  img.onload = () => {
+    const canvas = wechatBindQrCodeCanvas.value
+    if (!canvas) return
+    
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
+    ctx.clearRect(0, 0, size, size)
+    ctx.drawImage(img, 0, 0, size, size)
+  }
+  img.onerror = () => {
+    console.error('二维码生成失败')
+    showFailToast('二维码生成失败，请使用复制链接功能')
+  }
+  img.src = qrUrl
+}
+
+// 打开微信客户端（用于绑定）
+const openWechatClientForBind = () => {
+  if (!wechatBindAuthUrl.value) {
+    showFailToast('链接未生成')
     return
   }
   
-  // 触发微信授权流程
-  showFailToast('微信绑定功能开发中，请通过微信登录后自动绑定')
+  const userAgent = navigator.userAgent.toLowerCase()
+  const isWindows = userAgent.indexOf('win') > -1
+  const isMac = userAgent.indexOf('mac') > -1
+  
+  try {
+    if (isWindows || isMac) {
+      const weixinScheme = `weixin://dl/business/?t=${encodeURIComponent(wechatBindAuthUrl.value)}`
+      try {
+        window.location.href = weixinScheme
+        setTimeout(() => {
+          window.open(wechatBindAuthUrl.value, '_blank')
+          showSuccessToast('请在微信中打开链接完成绑定')
+        }, 2000)
+      } catch (error) {
+        window.open(wechatBindAuthUrl.value, '_blank')
+        showSuccessToast('已在新窗口打开，请在微信中完成绑定')
+      }
+    } else {
+      window.open(wechatBindAuthUrl.value, '_blank')
+      showSuccessToast('已在新窗口打开，请在微信中完成绑定')
+    }
+  } catch (error) {
+    console.error('打开微信客户端失败:', error)
+    copyBindAuthUrl()
+  }
+}
+
+// 复制绑定链接
+const copyBindAuthUrl = async () => {
+  if (!wechatBindAuthUrl.value) {
+    showFailToast('链接未生成')
+    return
+  }
+  
+  try {
+    await navigator.clipboard.writeText(wechatBindAuthUrl.value)
+    showSuccessToast('链接已复制，请在微信中打开')
+  } catch (error) {
+    const textArea = document.createElement('textarea')
+    textArea.value = wechatBindAuthUrl.value
+    textArea.style.position = 'fixed'
+    textArea.style.opacity = '0'
+    document.body.appendChild(textArea)
+    textArea.select()
+    try {
+      document.execCommand('copy')
+      showSuccessToast('链接已复制，请在微信中打开')
+    } catch (err) {
+      showFailToast('复制失败，请手动复制链接')
+    }
+    document.body.removeChild(textArea)
+  }
 }
 
 // 绑定钉钉
@@ -546,6 +826,43 @@ onMounted(() => {
 .add-student-actions {
   padding: 12px;
   padding-top: 0;
+}
+
+.wechat-bind-dialog {
+  text-align: center;
+}
+
+.wechat-bind-dialog .dialog-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #323233;
+  margin-bottom: 8px;
+}
+
+.wechat-bind-dialog .dialog-tips {
+  font-size: 14px;
+  color: #969799;
+  margin-bottom: 20px;
+}
+
+.wechat-bind-dialog .qr-code-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  background: #f7f8fa;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.wechat-bind-dialog .qr-code-canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.wechat-bind-dialog .dialog-actions {
+  margin-top: 20px;
 }
 </style>
 

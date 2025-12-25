@@ -110,10 +110,23 @@
 
               <!-- 确认按钮 -->
               <div class="action-buttons">
-                <van-button type="primary" round block @click="confirmAction">
+                <van-button 
+                  type="primary" 
+                  round 
+                  block 
+                  @click="confirmAction"
+                  :disabled="false"
+                >
                   确认并跳转
                 </van-button>
-                <van-button plain round block @click="resetState" style="margin-top: 10px;">
+                <van-button 
+                  plain 
+                  round 
+                  block 
+                  @click="resetState" 
+                  style="margin-top: 10px;"
+                  :disabled="false"
+                >
                   重新输入
                 </van-button>
               </div>
@@ -124,10 +137,23 @@
                 {{ parseResult.error || '抱歉，我没有理解您的指令。' }}
               </div>
               <div class="action-buttons">
-                <van-button type="primary" round block @click="confirmAction">
+                <van-button 
+                  type="primary" 
+                  round 
+                  block 
+                  @click="confirmAction"
+                  :disabled="false"
+                >
                   仍然跳转到新增任务
                 </van-button>
-                <van-button plain round block @click="resetState" style="margin-top: 10px;">
+                <van-button 
+                  plain 
+                  round 
+                  block 
+                  @click="resetState" 
+                  style="margin-top: 10px;"
+                  :disabled="false"
+                >
                   重新输入
                 </van-button>
               </div>
@@ -982,6 +1008,29 @@ const navigateToTaskFormDirectly = (prefillData, currentStudentId) => {
   font-size: 14px;
   text-align: center;
   padding: 12px;
+}
+
+.action-buttons {
+  margin-top: 16px;
+  /* 确保按钮在微信浏览器中可以点击 */
+  position: relative;
+  z-index: 10;
+  /* 防止点击穿透 */
+  pointer-events: auto;
+  /* 确保触摸事件正常工作 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.action-buttons :deep(.van-button) {
+  /* 确保按钮可以点击 */
+  pointer-events: auto;
+  touch-action: manipulation;
+  /* 防止按钮被禁用 */
+  user-select: none;
+  -webkit-user-select: none;
+  /* 确保按钮有足够的点击区域 */
+  min-height: 44px;
 }
 
 .manual-input {

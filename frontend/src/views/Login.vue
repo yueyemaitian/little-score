@@ -69,11 +69,51 @@
         </div>
       </div>
     </div>
+
+    <!-- 微信登录弹窗（通用浏览器） -->
+    <van-popup
+      v-model:show="showWechatLoginDialog"
+      position="center"
+      round
+      :style="{ width: '90%', maxWidth: '400px', padding: '20px' }"
+      closeable
+    >
+      <div class="wechat-login-dialog">
+        <div class="dialog-title">微信登录</div>
+        <div class="dialog-tips">请使用微信扫码或打开链接完成登录</div>
+        
+        <!-- 二维码 -->
+        <div class="qr-code-container" v-if="wechatAuthUrl">
+          <canvas ref="qrCodeCanvas" class="qr-code-canvas"></canvas>
+        </div>
+        
+        <!-- 操作按钮 -->
+        <div class="dialog-actions">
+          <van-button
+            type="primary"
+            block
+            round
+            @click="openWechatClient"
+            style="margin-bottom: 10px;"
+          >
+            打开微信客户端
+          </van-button>
+          <van-button
+            plain
+            block
+            round
+            @click="copyAuthUrl"
+          >
+            复制链接
+          </van-button>
+        </div>
+      </div>
+    </van-popup>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { showSuccessToast, showFailToast } from 'vant'
 import { useAuthStore } from '../stores/auth'
@@ -93,6 +133,9 @@ const form = ref({
 const loading = ref(false)
 const wechatLoading = ref(false)
 const dingtalkLoading = ref(false)
+const showWechatLoginDialog = ref(false)
+const wechatAuthUrl = ref('')
+const qrCodeCanvas = ref(null)
 
 const browserType = ref(getBrowserType())
 const recommendedMethods = computed(() => getRecommendedLoginMethods())
@@ -203,7 +246,7 @@ const handleWechatLogin = async () => {
       if (browserType.value === 'wechat') {
         // 在微信浏览器中，使用网页授权
         try {
-          // 从后端获取 AppID
+          // 从后端获取 AppID 和授权回调基础URL
           const appIdResponse = await authApi.getWechatAppId()
           const appId = appIdResponse.appId
           
@@ -213,8 +256,12 @@ const handleWechatLogin = async () => {
           }
           
           // 构建授权回调 URL
-          const redirectUri = encodeURIComponent(window.location.origin + '/login/wechat')
+          // 如果后端配置了 redirectBaseUrl，使用配置的；否则使用当前访问的域名
+          const baseUrl = appIdResponse.redirectBaseUrl || window.location.origin
+          const redirectUri = encodeURIComponent(baseUrl + '/login/wechat')
           const state = 'wechat_login_' + Date.now() // 简单的 state，实际可以使用更复杂的随机字符串
+          
+          console.log('微信授权跳转:', { appId, baseUrl, redirectUri })
           
           // 跳转到微信授权页面
           const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_userinfo&state=${state}#wechat_redirect`
@@ -225,11 +272,38 @@ const handleWechatLogin = async () => {
           showFailToast(message || '微信登录功能需要配置微信AppID，请联系管理员')
         }
       } else {
-        // 在通用浏览器中，提示用户扫码登录
-        // 实际应用中，应该显示二维码或跳转到扫码页面
-        showFailToast('请在微信中打开，或使用微信扫码登录')
-        // 实际实现示例：可以跳转到微信开放平台的扫码登录页面
-        // 或者显示一个二维码供用户扫描
+        // 在通用浏览器中，显示二维码和操作选项
+        try {
+          // 从后端获取 AppID 和授权回调基础URL
+          const appIdResponse = await authApi.getWechatAppId()
+          const appId = appIdResponse.appId
+          
+          if (!appId) {
+            showFailToast('微信登录功能需要配置微信AppID，请联系管理员')
+            return
+          }
+          
+          // 构建授权回调 URL
+          // 如果后端配置了 redirectBaseUrl，使用配置的；否则使用当前访问的域名
+          const baseUrl = appIdResponse.redirectBaseUrl || window.location.origin
+          const redirectUri = encodeURIComponent(baseUrl + '/login/wechat')
+          const state = 'wechat_login_' + Date.now()
+          
+          // 构建授权URL
+          wechatAuthUrl.value = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_userinfo&state=${state}#wechat_redirect`
+          
+          // 显示弹窗
+          showWechatLoginDialog.value = true
+          
+          // 生成二维码
+          nextTick(() => {
+            generateQRCode(wechatAuthUrl.value)
+          })
+        } catch (error) {
+          console.error('获取微信 AppID 失败:', error)
+          const message = extractErrorMessage(error)
+          showFailToast(message || '微信登录功能需要配置微信AppID，请联系管理员')
+        }
       }
     }
   } catch (error) {
@@ -308,6 +382,105 @@ const handleLoginSuccess = async (response) => {
   } catch (studentError) {
     console.error('获取学生列表失败:', studentError)
     router.push('/')
+  }
+}
+
+// 生成二维码
+const generateQRCode = (url) => {
+  if (!qrCodeCanvas.value) return
+  
+  // 使用在线API生成二维码（不需要安装额外库）
+  const size = 200
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}`
+  
+  const img = new Image()
+  img.crossOrigin = 'anonymous'
+  img.onload = () => {
+    const canvas = qrCodeCanvas.value
+    if (!canvas) return
+    
+    canvas.width = size
+    canvas.height = size
+    const ctx = canvas.getContext('2d')
+    ctx.clearRect(0, 0, size, size)
+    ctx.drawImage(img, 0, 0, size, size)
+  }
+  img.onerror = () => {
+    console.error('二维码生成失败')
+    showFailToast('二维码生成失败，请使用复制链接功能')
+  }
+  img.src = qrUrl
+}
+
+// 打开微信客户端
+const openWechatClient = () => {
+  if (!wechatAuthUrl.value) {
+    showFailToast('链接未生成')
+    return
+  }
+  
+  // 检测操作系统
+  const userAgent = navigator.userAgent.toLowerCase()
+  const isWindows = userAgent.indexOf('win') > -1
+  const isMac = userAgent.indexOf('mac') > -1
+  
+  try {
+    if (isWindows || isMac) {
+      // Windows/Mac 系统：尝试使用 weixin:// 协议打开微信客户端
+      // 注意：这个协议可能不总是有效，取决于微信客户端的安装和系统配置
+      const weixinScheme = `weixin://dl/business/?t=${encodeURIComponent(wechatAuthUrl.value)}`
+      
+      // 先尝试打开微信客户端
+      try {
+        window.location.href = weixinScheme
+        // 如果3秒后还在当前页面，说明可能没有安装微信客户端或协议无效
+        setTimeout(() => {
+          // 降级方案：在新窗口打开授权链接
+          window.open(wechatAuthUrl.value, '_blank')
+          showSuccessToast('请在微信中打开链接完成授权')
+        }, 2000)
+      } catch (error) {
+        // 如果协议打开失败，直接在新窗口打开授权链接
+        window.open(wechatAuthUrl.value, '_blank')
+        showSuccessToast('已在新窗口打开，请在微信中完成授权')
+      }
+    } else {
+      // 其他系统：直接在新窗口打开授权链接
+      window.open(wechatAuthUrl.value, '_blank')
+      showSuccessToast('已在新窗口打开，请在微信中完成授权')
+    }
+  } catch (error) {
+    console.error('打开微信客户端失败:', error)
+    // 降级方案：复制链接
+    copyAuthUrl()
+  }
+}
+
+// 复制授权链接
+const copyAuthUrl = async () => {
+  if (!wechatAuthUrl.value) {
+    showFailToast('链接未生成')
+    return
+  }
+  
+  try {
+    await navigator.clipboard.writeText(wechatAuthUrl.value)
+    showSuccessToast('链接已复制，请在微信中打开')
+  } catch (error) {
+    // 降级方案：使用传统方法
+    const textArea = document.createElement('textarea')
+    textArea.value = wechatAuthUrl.value
+    textArea.style.position = 'fixed'
+    textArea.style.opacity = '0'
+    document.body.appendChild(textArea)
+    textArea.select()
+    try {
+      document.execCommand('copy')
+      showSuccessToast('链接已复制，请在微信中打开')
+    } catch (err) {
+      showFailToast('复制失败，请手动复制链接')
+    }
+    document.body.removeChild(textArea)
   }
 }
 
@@ -540,6 +713,43 @@ onMounted(() => {
 
 .divider span {
   padding: 0 16px;
+}
+
+.wechat-login-dialog {
+  text-align: center;
+}
+
+.dialog-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #323233;
+  margin-bottom: 8px;
+}
+
+.dialog-tips {
+  font-size: 14px;
+  color: #969799;
+  margin-bottom: 20px;
+}
+
+.qr-code-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  background: #f7f8fa;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.qr-code-canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.dialog-actions {
+  margin-top: 20px;
 }
 </style>
 

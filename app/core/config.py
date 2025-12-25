@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     # 微信登录配置
     WECHAT_APP_ID: Optional[str] = None
     WECHAT_APP_SECRET: Optional[str] = None
+    WECHAT_REDIRECT_BASE_URL: Optional[str] = None  # 微信授权回调基础URL，例如：https://score.fanhaoyu.xyz
 
     # 钉钉登录配置
     DINGTALK_APP_KEY: Optional[str] = None
