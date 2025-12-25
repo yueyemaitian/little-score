@@ -17,6 +17,7 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      TZ: Asia/Shanghai
     volumes:
       # 数据库数据映射
       - ${MYSQL_DATA_DIR:-./data/mysql}:/var/lib/mysql
@@ -41,6 +42,18 @@ services:
       SQLALCHEMY_DATABASE_URI: mysql+aiomysql://${MYSQL_USER}:${MYSQL_PASSWORD}@db:3306/${MYSQL_DATABASE}
       SECRET_KEY: ${SECRET_KEY}
       BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS}
+      # AI 语音助手配置（可选）
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_API_BASE_URL: ${AI_API_BASE_URL:-https://api.deepseek.com}
+      AI_MODEL: ${AI_MODEL:-deepseek-chat}
+      # 微信登录配置（可选）
+      WECHAT_APP_ID: ${WECHAT_APP_ID:-}
+      WECHAT_APP_SECRET: ${WECHAT_APP_SECRET:-}
+      WECHAT_REDIRECT_BASE_URL: ${WECHAT_REDIRECT_BASE_URL:-}
+      # 钉钉登录配置（可选）
+      DINGTALK_APP_KEY: ${DINGTALK_APP_KEY:-}
+      DINGTALK_APP_SECRET: ${DINGTALK_APP_SECRET:-}
+      TZ: Asia/Shanghai
     depends_on:
       db:
         condition: service_healthy

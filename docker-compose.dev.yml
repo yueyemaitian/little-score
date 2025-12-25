@@ -17,6 +17,7 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-little_score}
       MYSQL_USER: ${MYSQL_USER:-app_user}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-app_password}
+      TZ: Asia/Shanghai
     ports:
       - "3306:3306"
     volumes:
@@ -49,9 +50,11 @@ services:
       # 微信登录配置（可选）
       WECHAT_APP_ID: ${WECHAT_APP_ID:-}
       WECHAT_APP_SECRET: ${WECHAT_APP_SECRET:-}
+      WECHAT_REDIRECT_BASE_URL: ${WECHAT_REDIRECT_BASE_URL:-}
       # 钉钉登录配置（可选）
       DINGTALK_APP_KEY: ${DINGTALK_APP_KEY:-}
       DINGTALK_APP_SECRET: ${DINGTALK_APP_SECRET:-}
+      TZ: Asia/Shanghai
     ports:
       - "8000:8000"
     depends_on:

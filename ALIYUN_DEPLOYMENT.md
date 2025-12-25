@@ -124,6 +124,16 @@ AI_MODEL=deepseek-chat
 # 或者使用通义千问:
 # AI_API_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 # AI_MODEL=qwen-turbo
+
+# 微信登录配置（可选，不配置则禁用微信登录功能）
+WECHAT_APP_ID=<你的微信 AppID>
+WECHAT_APP_SECRET=<你的微信 AppSecret>
+WECHAT_REDIRECT_BASE_URL=https://你的域名
+# 注意：WECHAT_REDIRECT_BASE_URL 必须与微信公众平台配置的授权回调域名一致
+
+# 钉钉登录配置（可选，不配置则禁用钉钉登录功能）
+DINGTALK_APP_KEY=<你的钉钉 AppKey>
+DINGTALK_APP_SECRET=<你的钉钉 AppSecret>
 EOF
 ```
 
