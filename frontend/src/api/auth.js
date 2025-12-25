@@ -32,6 +32,12 @@ export const authApi = {
   },
   bindAccount(data) {
     return api.post('/auth/accounts/bind', data)
+  },
+  getWechatJSSDKConfig(url) {
+    return api.get('/auth/wechat/jssdk-config', { params: { url } })
+  },
+  getWechatAppId() {
+    return api.get('/auth/wechat/app-id')
   }
 }
 

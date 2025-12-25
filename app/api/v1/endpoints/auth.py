@@ -21,6 +21,7 @@ from app.schemas.auth import BindAccountRequest, DingtalkLoginRequest, WechatLog
 from app.schemas.user import Token, UserCreate, UserRead
 from app.schemas.user_account import UserAccountRead
 from app.utils.oauth import get_dingtalk_user_info, get_wechat_user_info
+from app.utils.wechat_jssdk import get_wechat_jssdk_config
 
 router = APIRouter()
 
@@ -257,5 +258,61 @@ async def bind_account(
         )
     )
     return UserAccountRead.model_validate(account)
+
+
+@router.get("/wechat/app-id")
+async def get_wechat_app_id():
+    """获取微信 AppID（用于前端授权跳转）"""
+    settings = get_settings()
+    if not settings.WECHAT_APP_ID:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="微信 AppID 未配置"
+        )
+    return {"appId": settings.WECHAT_APP_ID}
+
+
+@router.get("/wechat/jssdk-config")
+async def get_wechat_jssdk_config_endpoint(url: str = None):
+    """获取微信 JS-SDK 配置"""
+    try:
+        # 如果没有传入 url，使用默认值（前端会传入）
+        if not url:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="缺少 url 参数"
+            )
+        
+        # 检查配置
+        from app.core.config import get_settings
+        settings = get_settings()
+        if not settings.WECHAT_APP_ID or not settings.WECHAT_APP_SECRET:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"微信配置未完整: WECHAT_APP_ID={'已配置' if settings.WECHAT_APP_ID else '未配置'}, "
+                       f"WECHAT_APP_SECRET={'已配置' if settings.WECHAT_APP_SECRET else '未配置'}。请检查 .env 文件配置"
+            )
+        
+        config = await get_wechat_jssdk_config(url)
+        if not config:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="微信 JS-SDK 配置获取失败。常见原因：\n"
+                       "1. AppID 或 AppSecret 配置错误\n"
+                       "2. IP 白名单限制（需要在微信公众平台配置服务器 IP）\n"
+                       "3. 应用类型不支持\n"
+                       "请查看后端日志获取详细错误信息（errcode 和 errmsg）"
+            )
+        return config
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        error_detail = traceback.format_exc()
+        print(f"⚠️ 获取微信 JS-SDK 配置异常: {error_detail}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取微信 JS-SDK 配置失败: {str(e)}"
+        )
 
 

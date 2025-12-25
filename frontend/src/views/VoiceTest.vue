@@ -290,19 +290,43 @@ const loadWeChatJSSDK = () => {
 }
 
 // 初始化微信 JS-SDK
-const initWeChatJSSDK = () => {
+const initWeChatJSSDK = async () => {
   if (!window.wx) {
     return
   }
   
-  // 注意：实际使用时需要从后端获取签名配置
-  // 这里仅作为示例，实际需要调用后端接口获取配置
-  // const config = await getWeChatConfig()
-  // window.wx.config(config)
-  
-  // 测试环境：直接使用，不进行签名验证（仅用于测试）
-  // 生产环境必须配置签名
-  wechatError.value = '提示：需要配置微信 JS-SDK 签名才能使用录音功能'
+  try {
+    // 从后端获取微信 JS-SDK 配置
+    const { authApi } = await import('../api/auth')
+    // 获取当前页面的完整 URL（去除 hash，但保留 query 参数）
+    const url = window.location.href.split('#')[0]
+    const config = await authApi.getWechatJSSDKConfig(url)
+    
+    // 配置微信 JS-SDK
+    window.wx.config({
+      debug: false, // 生产环境设为 false
+      appId: config.appId,
+      timestamp: config.timestamp,
+      nonceStr: config.nonceStr,
+      signature: config.signature,
+      jsApiList: ['startRecord', 'stopRecord', 'uploadVoice', 'onVoiceRecordEnd'] // 需要使用的 JS 接口列表
+    })
+    
+    // 配置成功后的回调
+    window.wx.ready(() => {
+      console.log('微信 JS-SDK 配置成功')
+      wechatError.value = ''
+    })
+    
+    // 配置失败的回调
+    window.wx.error((res) => {
+      console.error('微信 JS-SDK 配置失败:', res)
+      wechatError.value = `微信 JS-SDK 配置失败: ${res.errMsg || '未知错误'}`
+    })
+  } catch (error) {
+    console.error('获取微信 JS-SDK 配置失败:', error)
+    wechatError.value = `获取微信 JS-SDK 配置失败: ${error.message || '未知错误'}。请确保已配置微信 AppID 和 AppSecret`
+  }
 }
 
 onUnmounted(() => {

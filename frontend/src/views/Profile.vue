@@ -7,6 +7,7 @@
       <van-cell title="二级项目" is-link @click="showProject2List = true" />
       <van-cell title="惩罚选项" is-link @click="openPunishmentOptions" />
       <van-cell title="奖励选项" is-link @click="openRewardOptions" />
+      <van-cell title="语音输入测试" is-link @click="goToVoiceTest" />
       <van-cell title="退出登录" is-link @click="handleLogout" />
     </van-cell-group>
 

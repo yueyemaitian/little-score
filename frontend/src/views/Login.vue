@@ -26,8 +26,8 @@
           />
         </van-cell-group>
         <div style="margin: 16px;">
-          <!-- 邮箱登录 - 通用浏览器 -->
-          <div v-if="browserType === 'other'" class="email-login-section">
+          <!-- 邮箱登录 - 所有浏览器都显示 -->
+          <div class="email-login-section">
             <van-button round block type="primary" native-type="submit" :loading="loading">
               邮箱登录
             </van-button>
@@ -202,12 +202,28 @@ const handleWechatLogin = async () => {
       // 没有code，需要重定向到微信授权页面
       if (browserType.value === 'wechat') {
         // 在微信浏览器中，使用网页授权
-        // 注意：实际应用中，appId应该从后端获取或配置
-        showFailToast('微信登录功能需要配置微信AppID，请联系管理员')
-        // 实际实现示例：
-        // const redirectUri = encodeURIComponent(window.location.origin + '/login/wechat')
-        // const appId = 'YOUR_WECHAT_APP_ID'
-        // window.location.href = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_userinfo&state=STATE#wechat_redirect`
+        try {
+          // 从后端获取 AppID
+          const appIdResponse = await authApi.getWechatAppId()
+          const appId = appIdResponse.appId
+          
+          if (!appId) {
+            showFailToast('微信登录功能需要配置微信AppID，请联系管理员')
+            return
+          }
+          
+          // 构建授权回调 URL
+          const redirectUri = encodeURIComponent(window.location.origin + '/login/wechat')
+          const state = 'wechat_login_' + Date.now() // 简单的 state，实际可以使用更复杂的随机字符串
+          
+          // 跳转到微信授权页面
+          const authUrl = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${appId}&redirect_uri=${redirectUri}&response_type=code&scope=snsapi_userinfo&state=${state}#wechat_redirect`
+          window.location.href = authUrl
+        } catch (error) {
+          console.error('获取微信 AppID 失败:', error)
+          const message = extractErrorMessage(error)
+          showFailToast(message || '微信登录功能需要配置微信AppID，请联系管理员')
+        }
       } else {
         // 在通用浏览器中，提示用户扫码登录
         // 实际应用中，应该显示二维码或跳转到扫码页面

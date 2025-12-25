@@ -1,4 +1,6 @@
 import json
+import os
+from pathlib import Path
 from functools import lru_cache
 from typing import List, Optional, Union
 
@@ -52,13 +54,27 @@ class Settings(BaseSettings):
         return v
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        # 使用绝对路径，确保能找到 .env 文件
+        # 从当前文件位置向上查找项目根目录的 .env 文件
+        env_file=str(Path(__file__).parent.parent.parent / ".env"),
         env_file_encoding="utf-8",
+        # 同时支持从环境变量读取（优先级更高）
+        env_ignore_empty=True,
     )
 
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()  # type: ignore[arg-type]
+    settings = Settings()  # type: ignore[arg-type]
+    
+    # 开发环境：打印配置信息（不包含敏感信息）
+    if os.getenv("ENVIRONMENT", "").lower() != "production":
+        print(f"✓ 配置已加载:")
+        print(f"  - WECHAT_APP_ID: {'已配置' if settings.WECHAT_APP_ID else '未配置'}")
+        print(f"  - WECHAT_APP_SECRET: {'已配置' if settings.WECHAT_APP_SECRET else '未配置'}")
+        print(f"  - DINGTALK_APP_KEY: {'已配置' if settings.DINGTALK_APP_KEY else '未配置'}")
+        print(f"  - DINGTALK_APP_SECRET: {'已配置' if settings.DINGTALK_APP_SECRET else '未配置'}")
+    
+    return settings
 
 

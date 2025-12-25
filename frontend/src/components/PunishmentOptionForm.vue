@@ -121,6 +121,10 @@ const props = defineProps({
   option: {
     type: Object,
     default: null
+  },
+  prefilledName: {
+    type: String,
+    default: null
   }
 })
 
@@ -282,13 +286,14 @@ const onSubmit = async () => {
 
   loading.value = true
   try {
+    let result
     if (props.option) {
-      await scoresApi.updatePunishmentOption(props.option.id, form.value)
+      result = await scoresApi.updatePunishmentOption(props.option.id, form.value)
     } else {
-      await scoresApi.createPunishmentOption(form.value)
+      result = await scoresApi.createPunishmentOption(form.value)
     }
     showSuccessToast('保存成功')
-    emit('success')
+    emit('success', result)
   } catch (error) {
     const message = extractErrorMessage(error)
     showFailToast(message)
@@ -320,6 +325,9 @@ onMounted(async () => {
       related_project_level1_id: props.option.related_project_level1_id,
       related_project_level2_id: props.option.related_project_level2_id
     }
+  } else if (props.prefilledName) {
+    // 如果有预填充的名称，设置到表单
+    form.value.name = props.prefilledName
   }
 })
 </script>

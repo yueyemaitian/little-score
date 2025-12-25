@@ -1,14 +1,12 @@
 <template>
   <div class="voice-assistant" v-if="isSupported">
     <!-- 语音助手按钮 -->
-    <van-floating-bubble
-      v-model:offset="position"
-      axis="xy"
-      magnetic="x"
-      icon="service-o"
+    <div
+      class="voice-bubble-fixed"
       @click="togglePanel"
-      class="voice-bubble"
-    />
+    >
+      <van-icon name="service-o" class="voice-bubble-icon" />
+    </div>
 
     <!-- 语音助手面板 -->
     <van-popup
@@ -196,16 +194,89 @@
         </div>
       </div>
     </van-popup>
+
+    <!-- 引导新增一级项目弹窗 -->
+    <van-popup 
+      v-model:show="showProject1Form" 
+      position="bottom" 
+      :style="{ height: '60%' }" 
+      closeable
+      @close="handleProject1Cancel"
+    >
+      <van-nav-bar
+        title="新增一级项目"
+        left-arrow
+        @click-left="handleProject1Cancel"
+      />
+      <ProjectForm
+        v-if="showProject1Form && pendingPrefillData"
+        :project="null"
+        level="1"
+        :prefilled-name="pendingPrefillData.project_level1_name"
+        @success="handleProject1Success"
+        @cancel="handleProject1Cancel"
+      />
+    </van-popup>
+
+    <!-- 引导新增二级项目弹窗 -->
+    <van-popup 
+      v-model:show="showProject2Form" 
+      position="bottom" 
+      :style="{ height: '60%' }" 
+      closeable
+      @close="handleProject2Cancel"
+    >
+      <van-nav-bar
+        title="新增二级项目"
+        left-arrow
+        @click-left="handleProject2Cancel"
+      />
+      <ProjectForm
+        v-if="showProject2Form && pendingPrefillData"
+        :project="null"
+        level="2"
+        :parent-id="createdProject1Id || pendingPrefillData.project_level1_id"
+        :prefilled-name="pendingPrefillData.project_level2_name"
+        @success="handleProject2Success"
+        @cancel="handleProject2Cancel"
+      />
+    </van-popup>
+
+    <!-- 引导新增惩罚选项弹窗 -->
+    <van-popup 
+      v-model:show="showPunishmentForm" 
+      position="bottom" 
+      :style="{ height: '60%' }" 
+      closeable
+      @close="handlePunishmentCancel"
+    >
+      <van-nav-bar
+        title="新增惩罚选项"
+        left-arrow
+        @click-left="handlePunishmentCancel"
+      />
+      <PunishmentOptionForm
+        v-if="showPunishmentForm && pendingPrefillData"
+        :option="null"
+        :prefilled-name="pendingPrefillData.punishment_option_name"
+        @success="handlePunishmentSuccess"
+        @cancel="handlePunishmentCancel"
+      />
+    </van-popup>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { showFailToast, showSuccessToast } from 'vant'
 import { aiApi } from '../api/ai'
 import { useStudentsStore } from '../stores/students'
 import VoiceRecorder from './VoiceRecorder.vue'
+import ProjectForm from './ProjectForm.vue'
+import PunishmentOptionForm from './PunishmentOptionForm.vue'
+import { projectsApi } from '../api/projects'
+import { scoresApi } from '../api/scores'
 
 const router = useRouter()
 const studentsStore = useStudentsStore()
@@ -217,8 +288,19 @@ const isProcessing = ref(false)
 const recognizedText = ref('')
 const manualText = ref('')
 const parseResult = ref(null)
-const position = ref({ x: window.innerWidth - 70, y: window.innerHeight - 200 })
 const voiceRecorderRef = ref(null)
+
+// 引导新增流程状态
+const guideStep = ref(null) // 'project1' | 'project2' | 'punishment' | 'task' | null
+const pendingPrefillData = ref(null) // 待创建任务的数据
+const createdProject1Id = ref(null) // 已创建的一级项目ID
+const createdProject2Id = ref(null) // 已创建的二级项目ID
+const createdPunishmentId = ref(null) // 已创建的惩罚选项ID
+
+// 引导弹窗显示状态
+const showProject1Form = ref(false)
+const showProject2Form = ref(false)
+const showPunishmentForm = ref(false)
 
 // 检测是否支持语音识别
 const isSupported = ref(false)
@@ -234,7 +316,7 @@ const isListening = computed(() => voiceRecorderRef.value?.isListening || false)
 // 处理语音识别文本
 let textProcessTimer = null
 let lastTextTime = 0 // 最后一次收到文本的时间
-const VOICE_INPUT_DELAY = 1500 // 用户停止输入1.5秒后再开始AI解析
+const VOICE_INPUT_DELAY = 2000 // 用户停止输入2秒后再开始AI解析
 
 const handleVoiceText = (text) => {
   recognizedText.value = text
@@ -248,9 +330,9 @@ const handleVoiceText = (text) => {
   
   // 如果有文本且不在处理中，设置延迟处理
   if (text && text.trim() && !isProcessing.value) {
-    // 等待用户停止输入1.5秒后再处理
+    // 等待用户停止输入2秒后再处理
     textProcessTimer = setTimeout(() => {
-      // 检查：距离最后一次收到文本是否已经过了1.5秒
+      // 检查：距离最后一次收到文本是否已经过了2秒
       const timeSinceLastText = Date.now() - lastTextTime
       if (timeSinceLastText >= VOICE_INPUT_DELAY && 
           !isProcessing.value && 
@@ -269,7 +351,7 @@ const handleVoiceText = (text) => {
             }
           }, 500)
         } else {
-          // 识别已结束，且已经过了1.5秒，直接处理
+          // 识别已结束，且已经过了2秒，直接处理
           processVoiceInput(text.trim())
         }
       }
@@ -366,6 +448,191 @@ const getActionText = (action) => {
   return actionMap[action] || '❓ 未知操作'
 }
 
+// 检测缺失的项目/选项，启动引导流程
+const checkAndStartGuide = (prefillData) => {
+  // 检测缺失的项目/选项
+  const needsProject1 = prefillData.project_level1_name && !prefillData.project_level1_id
+  const needsProject2 = prefillData.project_level2_name && !prefillData.project_level2_id
+  const needsPunishment = prefillData.punishment_option_name && !prefillData.punishment_option_id && prefillData.reward_type === 'punish'
+  
+  // 如果有缺失的项目/选项，启动引导流程
+  if (needsProject1 || needsProject2 || needsPunishment) {
+    pendingPrefillData.value = prefillData
+    createdProject1Id.value = null
+    createdProject2Id.value = null
+    createdPunishmentId.value = null
+    
+    // 按顺序启动引导：一级项目 -> 二级项目 -> 惩罚选项
+    if (needsProject1) {
+      guideStep.value = 'project1'
+      showProject1Form.value = true
+    } else if (needsProject2) {
+      guideStep.value = 'project2'
+      showProject2Form.value = true
+    } else if (needsPunishment) {
+      guideStep.value = 'punishment'
+      showPunishmentForm.value = true
+    }
+    return true
+  }
+  return false
+}
+
+// 继续引导流程（创建成功后调用）
+const continueGuide = () => {
+  if (!pendingPrefillData.value) {
+    return
+  }
+  
+  const prefillData = pendingPrefillData.value
+  const needsProject2 = prefillData.project_level2_name && !prefillData.project_level2_id && !createdProject2Id.value
+  const needsPunishment = prefillData.punishment_option_name && !prefillData.punishment_option_id && !createdPunishmentId.value && prefillData.reward_type === 'punish'
+  
+  // 继续下一步引导
+  if (needsProject2) {
+    guideStep.value = 'project2'
+    showProject2Form.value = true
+  } else if (needsPunishment) {
+    guideStep.value = 'punishment'
+    showPunishmentForm.value = true
+  } else {
+    // 所有引导完成，跳转到新增任务页面
+    navigateToTaskForm()
+  }
+}
+
+// 跳转到新增任务页面
+const navigateToTaskForm = () => {
+  if (!pendingPrefillData.value) {
+    return
+  }
+  
+  const currentStudentId = studentsStore.currentStudent?.id
+  const prefillData = { ...pendingPrefillData.value }
+  
+  // 使用已创建的项目/选项ID
+  if (createdProject1Id.value) {
+    prefillData.project_level1_id = createdProject1Id.value
+  }
+  if (createdProject2Id.value) {
+    prefillData.project_level2_id = createdProject2Id.value
+  }
+  if (createdPunishmentId.value) {
+    prefillData.punishment_option_id = createdPunishmentId.value
+  }
+  
+  const query = {
+    action: 'add',
+    prefill: encodeURIComponent(JSON.stringify(prefillData)),
+    _t: Date.now()
+  }
+  
+  if (currentStudentId) {
+    query.student_id = currentStudentId
+  }
+  
+  if (router.currentRoute.value.path === '/tasks') {
+    router.replace({
+      path: '/tasks',
+      query
+    })
+  } else {
+    router.push({
+      path: '/tasks',
+      query
+    })
+  }
+  
+  // 清理引导状态
+  guideStep.value = null
+  pendingPrefillData.value = null
+  createdProject1Id.value = null
+  createdProject2Id.value = null
+  createdPunishmentId.value = null
+  showPanel.value = false
+}
+
+// 处理一级项目创建成功
+const handleProject1Success = async (newProject) => {
+  createdProject1Id.value = newProject.id
+  showProject1Form.value = false
+  showSuccessToast('一级项目创建成功')
+  // 继续引导流程
+  continueGuide()
+}
+
+// 处理二级项目创建成功
+const handleProject2Success = async (newProject) => {
+  createdProject2Id.value = newProject.id
+  showProject2Form.value = false
+  showSuccessToast('二级项目创建成功')
+  // 继续引导流程
+  continueGuide()
+}
+
+// 处理惩罚选项创建成功
+const handlePunishmentSuccess = async (newOption) => {
+  createdPunishmentId.value = newOption.id
+  showPunishmentForm.value = false
+  showSuccessToast('惩罚选项创建成功')
+  // 继续引导流程
+  continueGuide()
+}
+
+// 处理一级项目取消
+const handleProject1Cancel = () => {
+  showProject1Form.value = false
+  guideStep.value = null
+  // 清除一级项目的需求，标记为已跳过
+  if (pendingPrefillData.value) {
+    pendingPrefillData.value.project_level1_name = null
+  }
+  // 延迟执行，确保弹窗关闭后再继续
+  setTimeout(() => {
+    continueGuide()
+  }, 200)
+}
+
+// 处理二级项目取消
+const handleProject2Cancel = () => {
+  showProject2Form.value = false
+  guideStep.value = null
+  // 清除二级项目的需求，标记为已跳过
+  if (pendingPrefillData.value) {
+    pendingPrefillData.value.project_level2_name = null
+  }
+  // 延迟执行，确保弹窗关闭后再继续
+  setTimeout(() => {
+    continueGuide()
+  }, 200)
+}
+
+// 处理惩罚选项取消
+const handlePunishmentCancel = () => {
+  showPunishmentForm.value = false
+  guideStep.value = null
+  // 清除惩罚选项的需求，标记为已跳过
+  if (pendingPrefillData.value) {
+    pendingPrefillData.value.punishment_option_name = null
+  }
+  // 延迟执行，确保弹窗关闭后再继续
+  setTimeout(() => {
+    continueGuide()
+  }, 200)
+}
+
+// 处理引导流程取消（跳过当前步骤，继续下一个）- 保留作为备用
+const handleGuideCancel = () => {
+  // 根据当前显示的弹窗判断
+  if (showProject1Form.value) {
+    handleProject1Cancel()
+  } else if (showProject2Form.value) {
+    handleProject2Cancel()
+  } else if (showPunishmentForm.value) {
+    handlePunishmentCancel()
+  }
+}
+
 const confirmAction = () => {
   // 确保停止语音识别
   if (voiceRecorderRef.value && isListening.value) {
@@ -391,36 +658,21 @@ const confirmAction = () => {
     project_level1_name: data.project_level1_name || null,
     project_level2_name: data.project_level2_name || null,
     punishment_option_name: data.punishment_option_name || null,
+    punishment_option_id: data.punishment_option_id || null,
     // 传递警告信息
     warnings: intent?.warnings || []
   }
 
-  // 如果是新增任务或未知操作，都跳转到新增任务页面
+  // 如果是新增任务或未知操作
   if (!intent || intent.action === 'add_task' || intent.action === 'unknown') {
-    const query = {
-      action: 'add',
-      prefill: encodeURIComponent(JSON.stringify(prefillData)),
-      _t: Date.now()  // 添加时间戳，确保路由变化能被检测到
+    // 检测是否需要引导新增项目/选项
+    if (checkAndStartGuide(prefillData)) {
+      // 已启动引导流程，等待用户完成
+      return
     }
     
-    // 如果当前有选中的学生，传递学生ID
-    if (currentStudentId) {
-      query.student_id = currentStudentId
-    }
-    
-    // 如果当前已经在任务页面，使用 replace 确保触发路由变化
-    if (router.currentRoute.value.path === '/tasks') {
-      router.replace({
-        path: '/tasks',
-        query
-      })
-    } else {
-      router.push({
-        path: '/tasks',
-        query
-      })
-    }
-    showPanel.value = false
+    // 没有缺失的项目/选项，直接跳转
+    navigateToTaskFormDirectly(prefillData, currentStudentId)
   } else if (intent.action === 'exchange_points') {
     // 跳转到积分页面并传递预填数据
     const query = {
@@ -455,24 +707,36 @@ const confirmAction = () => {
     showPanel.value = false
   } else {
     // 其他情况，默认跳转到新增任务页面
-    const query = {
-      action: 'add',
-      prefill: encodeURIComponent(JSON.stringify(prefillData)),
-      _t: Date.now()
-    }
-    
-    if (currentStudentId) {
-      query.student_id = currentStudentId
-    }
-    
+    navigateToTaskFormDirectly(prefillData, currentStudentId)
+  }
+
+  resetState()
+}
+
+// 直接跳转到新增任务页面（不经过引导流程）
+const navigateToTaskFormDirectly = (prefillData, currentStudentId) => {
+  const query = {
+    action: 'add',
+    prefill: encodeURIComponent(JSON.stringify(prefillData)),
+    _t: Date.now()
+  }
+  
+  if (currentStudentId) {
+    query.student_id = currentStudentId
+  }
+  
+  if (router.currentRoute.value.path === '/tasks') {
+    router.replace({
+      path: '/tasks',
+      query
+    })
+  } else {
     router.push({
       path: '/tasks',
       query
     })
-    showPanel.value = false
   }
-
-  resetState()
+  showPanel.value = false
 }
 </script>
 
@@ -482,12 +746,30 @@ const confirmAction = () => {
   z-index: 1000;
 }
 
-.voice-bubble {
-  --van-floating-bubble-size: 52px;
-  --van-floating-bubble-background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  position: absolute !important; /* 覆盖组件默认的 fixed，保证在“壳”内部 */
+.voice-bubble-fixed {
+  position: absolute;
   right: 16px;
   bottom: 80px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  z-index: 1001;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.voice-bubble-fixed:active {
+  transform: scale(0.95);
+}
+
+.voice-bubble-icon {
+  font-size: 24px;
+  color: #fff;
 }
 
 .assistant-panel {

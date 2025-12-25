@@ -71,6 +71,10 @@ const props = defineProps({
   parentId: {
     type: Number,
     default: null
+  },
+  prefilledName: {
+    type: String,
+    default: null
   }
 })
 
@@ -190,14 +194,15 @@ const onSubmit = async () => {
       parent_id: props.level === '2' ? form.value.parent_id : null
     }
 
+    let result
     if (props.project) {
-      await projectsApi.update(props.project.id, data)
+      result = await projectsApi.update(props.project.id, data)
     } else {
-      await projectsApi.create(data)
+      result = await projectsApi.create(data)
     }
     
     showSuccessToast('保存成功')
-    emit('success')
+    emit('success', result)
   } catch (error) {
     const message = extractErrorMessage(error)
     showFailToast(message)
@@ -220,6 +225,10 @@ onMounted(async () => {
     }
   } else {
     // 新增模式
+    if (props.prefilledName) {
+      // 如果有预填充的名称，设置到表单
+      form.value.name = props.prefilledName
+    }
     if (props.level === '2' && props.parentId) {
       // 如果是新增二级项目且传入了 parentId，在加载完一级项目列表后设置
       // 此时一级项目列表已经加载完成，可以正确显示
