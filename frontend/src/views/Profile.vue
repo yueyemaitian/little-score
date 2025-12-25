@@ -1,6 +1,7 @@
 <template>
   <div class="profile-container">
     <van-cell-group inset style="margin: 12px;">
+      <van-cell title="账号管理" is-link @click="showAccountList = true" />
       <van-cell title="学生管理" is-link @click="showStudentList = true" />
       <van-cell title="一级项目" is-link @click="showProject1List = true" />
       <van-cell title="二级项目" is-link @click="showProject2List = true" />
@@ -8,6 +9,103 @@
       <van-cell title="奖励选项" is-link @click="openRewardOptions" />
       <van-cell title="退出登录" is-link @click="handleLogout" />
     </van-cell-group>
+
+    <!-- 账号管理列表 -->
+    <van-popup v-model:show="showAccountList" position="bottom" :style="{ height: '80%' }">
+      <van-nav-bar
+        title="账号管理"
+        left-arrow
+        @click-left="showAccountList = false"
+      />
+      <div class="account-list-content">
+        <van-loading v-if="loadingAccounts" vertical>加载中...</van-loading>
+        <div v-else>
+          <van-cell-group inset style="margin: 12px;">
+            <van-cell
+              v-for="account in accounts"
+              :key="account.id"
+              :title="getAccountTypeName(account.account_type)"
+              :label="account.account_name || account.account_id"
+              :value="account.account_type === 'email' ? '已绑定' : '已绑定'"
+            >
+              <template #icon>
+                <van-icon :name="getAccountIcon(account.account_type)" style="margin-right: 8px;" />
+              </template>
+            </van-cell>
+          </van-cell-group>
+          
+          <div class="bind-account-section">
+            <div class="section-title">绑定账号</div>
+            <van-cell-group inset style="margin: 12px;">
+              <van-cell
+                v-if="!hasAccountType('wechat')"
+                title="微信"
+                is-link
+                @click="showBindWechat = true"
+              >
+                <template #icon>
+                  <van-icon name="wechat" style="margin-right: 8px;" />
+                </template>
+              </van-cell>
+              <van-cell
+                v-if="!hasAccountType('dingtalk')"
+                title="钉钉"
+                is-link
+                @click="showBindDingtalk = true"
+              >
+                <template #icon>
+                  <van-icon name="dingtalk" style="margin-right: 8px;" />
+                </template>
+              </van-cell>
+              <van-cell
+                v-if="!hasAccountType('email')"
+                title="邮箱"
+                is-link
+                @click="showBindEmail = true"
+              >
+                <template #icon>
+                  <van-icon name="envelop-o" style="margin-right: 8px;" />
+                </template>
+              </van-cell>
+            </van-cell-group>
+          </div>
+        </div>
+      </div>
+    </van-popup>
+
+    <!-- 绑定邮箱弹窗 -->
+    <van-popup v-model:show="showBindEmail" position="bottom" :style="{ height: '60%' }">
+      <van-nav-bar
+        title="绑定邮箱"
+        left-arrow
+        @click-left="showBindEmail = false"
+      />
+      <van-form @submit="handleBindEmail" style="padding: 16px;">
+        <van-cell-group inset>
+          <van-field
+            v-model="bindEmailForm.email"
+            name="email"
+            label="邮箱"
+            placeholder="请输入邮箱"
+            :rules="[{ required: true, message: '请填写邮箱' }]"
+            type="email"
+          />
+          <van-field
+            v-model="bindEmailForm.password"
+            type="password"
+            name="password"
+            label="密码"
+            placeholder="请输入密码（6-20位）"
+            :rules="passwordRules"
+          />
+        </van-cell-group>
+        <div style="margin: 16px;">
+          <van-button round block type="primary" native-type="submit" :loading="binding">
+            绑定
+          </van-button>
+        </div>
+      </van-form>
+    </van-popup>
 
     <!-- 学生管理列表 -->
     <van-popup v-model:show="showStudentList" position="bottom" :style="{ height: '80%' }">
@@ -145,7 +243,9 @@ import { useAuthStore } from '../stores/auth'
 import { useStudentsStore } from '../stores/students'
 import { useEnumsStore } from '../stores/enums'
 import { studentsApi } from '../api/students'
+import { authApi } from '../api/auth'
 import { extractErrorMessage } from '../utils/errorHandler'
+import { getBrowserType } from '../utils/browser'
 import StudentForm from '../components/StudentForm.vue'
 import ProjectList from '../components/ProjectList.vue'
 import ProjectForm from '../components/ProjectForm.vue'
@@ -172,6 +272,38 @@ const showPunishmentOptions = ref(false)
 const showRewardOptions = ref(false)
 const editingProject = ref(null)
 const wasEmptyBeforeAdd = ref(false) // 记录添加前是否为空
+
+// 账号管理相关
+const showAccountList = ref(false)
+const loadingAccounts = ref(false)
+const accounts = ref([])
+const showBindEmail = ref(false)
+const showBindWechat = ref(false)
+const showBindDingtalk = ref(false)
+const binding = ref(false)
+const bindEmailForm = ref({
+  email: '',
+  password: ''
+})
+
+// 密码验证规则
+const validatePasswordLength = (val) => {
+  if (!val) {
+    return true
+  }
+  if (val.length < 6) {
+    return '密码长度至少为6位'
+  }
+  if (val.length > 20) {
+    return '密码长度不能超过20位'
+  }
+  return true
+}
+
+const passwordRules = [
+  { required: true, message: '请填写密码' },
+  { validator: validatePasswordLength }
+]
 
 const getStudentLabel = (student) => {
   const genderOption = enumsStore.gender.find(g => g.value === student.gender)
@@ -295,6 +427,101 @@ const handleRouteAction = () => {
 // 监听路由变化
 watch(() => route.query.action, () => {
   handleRouteAction()
+})
+
+// 获取账号类型名称
+const getAccountTypeName = (type) => {
+  const names = {
+    email: '邮箱',
+    wechat: '微信',
+    dingtalk: '钉钉'
+  }
+  return names[type] || type
+}
+
+// 获取账号类型图标
+const getAccountIcon = (type) => {
+  const icons = {
+    email: 'envelop-o',
+    wechat: 'wechat',
+    dingtalk: 'dingtalk'
+  }
+  return icons[type] || 'user-o'
+}
+
+// 检查是否已有某种类型的账号
+const hasAccountType = (type) => {
+  return accounts.value.some(account => account.account_type === type)
+}
+
+// 获取账号列表
+const fetchAccounts = async () => {
+  loadingAccounts.value = true
+  try {
+    accounts.value = await authApi.getMyAccounts()
+  } catch (error) {
+    console.error('获取账号列表失败:', error)
+    showFailToast('获取账号列表失败')
+  } finally {
+    loadingAccounts.value = false
+  }
+}
+
+// 绑定邮箱
+const handleBindEmail = async () => {
+  if (bindEmailForm.value.password.length < 6 || bindEmailForm.value.password.length > 20) {
+    showFailToast('密码长度必须在6-20位之间')
+    return
+  }
+  
+  binding.value = true
+  try {
+    await authApi.bindAccount({
+      account_type: 'email',
+      account_id: bindEmailForm.value.email,
+      password: bindEmailForm.value.password
+    })
+    showSuccessToast('绑定成功')
+    showBindEmail.value = false
+    bindEmailForm.value = { email: '', password: '' }
+    await fetchAccounts()
+  } catch (error) {
+    const message = extractErrorMessage(error)
+    showFailToast(message)
+  } finally {
+    binding.value = false
+  }
+}
+
+// 绑定微信
+const handleBindWechat = async () => {
+  const browserType = getBrowserType()
+  if (browserType !== 'wechat') {
+    showFailToast('请在微信浏览器中绑定')
+    return
+  }
+  
+  // 触发微信授权流程
+  showFailToast('微信绑定功能开发中，请通过微信登录后自动绑定')
+}
+
+// 绑定钉钉
+const handleBindDingtalk = async () => {
+  const browserType = getBrowserType()
+  if (browserType !== 'dingtalk') {
+    showFailToast('请在钉钉浏览器中绑定')
+    return
+  }
+  
+  // 触发钉钉授权流程
+  showFailToast('钉钉绑定功能开发中，请通过钉钉登录后自动绑定')
+}
+
+// 监听账号管理弹窗
+watch(showAccountList, (show) => {
+  if (show) {
+    fetchAccounts()
+  }
 })
 
 onMounted(() => {

@@ -13,13 +13,6 @@
         </div>
         <van-icon name="arrow-down" class="header-arrow" />
       </div>
-      <div class="header-right" @click.stop>
-        <div class="header-icon-wrapper">
-          <slot name="right-icon">
-            <van-icon name="bell" class="header-icon" />
-          </slot>
-        </div>
-      </div>
     </div>
 
     <!-- 孩子下拉选择 / 新增 -->
@@ -158,30 +151,5 @@ const onConfirm = ({ selectedOptions }) => {
   margin-top: 2px;
   font-size: 12px;
   color: #6b7280;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  position: relative;
-  /* 扩展点击区域到整个header区域的1/10 */
-  flex: 0 0 10%;
-  justify-content: flex-start;
-  min-height: 100%;
-}
-
-.header-icon-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  width: 100%;
-  height: 100%;
-  padding-left: 8px;
-  cursor: pointer;
-}
-
-.header-icon {
-  font-size: 20px;
-  color: #9ca3af;
 }
 </style>

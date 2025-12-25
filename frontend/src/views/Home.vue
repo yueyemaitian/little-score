@@ -13,9 +13,6 @@
         </div>
         <van-icon name="arrow-down" class="header-arrow" />
       </div>
-      <div class="header-right">
-        <van-icon name="bell" class="header-icon" />
-      </div>
     </div>
 
     <!-- 孩子下拉选择 / 新增 -->
@@ -392,16 +389,6 @@ onMounted(() => {
   margin-top: 2px;
   font-size: 12px;
   color: #6b7280;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-}
-
-.header-icon {
-  font-size: 20px;
-  color: #9ca3af;
 }
 
 .home-scroll {

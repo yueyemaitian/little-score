@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.security import verify_password
-from app.crud.user import get_user_by_email
+from app.crud.user import get_user_by_email, get_user_by_id
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.user import TokenData
@@ -34,7 +34,16 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
 
-    user = await get_user_by_email(db, token_data.sub)  # type: ignore[arg-type]
+    # token的sub可能是email或user_id（格式：user_id:123）
+    sub_str = token_data.sub  # type: ignore[arg-type]
+    if sub_str.startswith("user_id:"):
+        # 使用user_id查找
+        user_id = int(sub_str.split(":")[1])
+        user = await get_user_by_id(db, user_id)
+    else:
+        # 使用email查找（向后兼容）
+        user = await get_user_by_email(db, sub_str)
+    
     if user is None:
         raise credentials_exception
     return user

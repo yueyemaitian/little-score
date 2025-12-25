@@ -10,5 +10,6 @@ from app.models.task_and_score import (  # noqa: F401
     Task,
 )
 from app.models.user import User  # noqa: F401
+from app.models.user_account import UserAccount  # noqa: F401
 
 

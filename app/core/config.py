@@ -26,6 +26,14 @@ class Settings(BaseSettings):
     AI_API_BASE_URL: str = "https://api.deepseek.com"  # 默认使用 DeepSeek
     AI_MODEL: str = "deepseek-chat"  # 默认模型
 
+    # 微信登录配置
+    WECHAT_APP_ID: Optional[str] = None
+    WECHAT_APP_SECRET: Optional[str] = None
+
+    # 钉钉登录配置
+    DINGTALK_APP_KEY: Optional[str] = None
+    DINGTALK_APP_SECRET: Optional[str] = None
+
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v):

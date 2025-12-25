@@ -20,6 +20,18 @@ export const authApi = {
   },
   getMe() {
     return api.get('/auth/me')
+  },
+  loginWithWechat(code, state = null) {
+    return api.post('/auth/login/wechat', { code, state })
+  },
+  loginWithDingtalk(code, state = null) {
+    return api.post('/auth/login/dingtalk', { code, state })
+  },
+  getMyAccounts() {
+    return api.get('/auth/accounts')
+  },
+  bindAccount(data) {
+    return api.post('/auth/accounts/bind', data)
   }
 }
 

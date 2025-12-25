@@ -14,7 +14,8 @@ def create_app() -> FastAPI:
     # 处理 CORS 配置，同时支持带斜杠和不带斜杠的 Origin
     cors_origins = settings.BACKEND_CORS_ORIGINS
     if isinstance(cors_origins, str):
-        cors_origins = [cors_origins]
+        # 如果是字符串，按逗号分割
+        cors_origins = [origin.strip() for origin in cors_origins.split(',') if origin.strip()]
     elif not cors_origins:
         cors_origins = ["*"]  # 开发环境允许所有来源
     else:
@@ -30,6 +31,22 @@ def create_app() -> FastAPI:
             if origin_str and not origin_str.endswith('/'):
                 normalized_origins.add(origin_str + '/')
         cors_origins = list(normalized_origins)
+    
+    # 开发环境：自动添加常见的 localhost 变体
+    import os
+    if os.getenv("ENVIRONMENT", "").lower() != "production":
+        localhost_variants = [
+            "http://localhost",
+            "http://localhost/",
+            "http://localhost:5173",
+            "http://localhost:5173/",
+            "http://127.0.0.1",
+            "http://127.0.0.1/",
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:5173/",
+        ]
+        if cors_origins != ["*"]:
+            cors_origins = list(set(cors_origins + localhost_variants))
     
     app.add_middleware(
         CORSMiddleware,
