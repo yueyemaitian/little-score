@@ -24,3 +24,4 @@ class BindAccountRequest(BaseModel):
     password: str | None = None
 
 
+

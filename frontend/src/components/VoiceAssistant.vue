@@ -84,6 +84,10 @@
                     <span class="detail-label">积分：</span>
                     <span class="detail-value highlight">+{{ parseResult.intent.data.reward_points }}</span>
                   </div>
+                  <div v-if="parseResult.intent.data.punishment_option_name" class="detail-item">
+                    <span class="detail-label">惩罚选项：</span>
+                    <span class="detail-value highlight">{{ parseResult.intent.data.punishment_option_name_matched || parseResult.intent.data.punishment_option_name }}</span>
+                  </div>
                 </div>
                 <div v-else-if="parseResult.intent.action === 'exchange_points'" class="intent-details">
                   <div v-if="parseResult.intent.data.reward_option_name" class="detail-item">
@@ -117,16 +121,23 @@
               </div>
             </template>
             
-            <template v-else-if="parseResult.error">
-              <div class="error-message">{{ parseResult.error }}</div>
-              <van-button plain round block @click="resetState" style="margin-top: 10px;">
-                重试
-              </van-button>
+            <template v-else-if="parseResult.error || (parseResult.intent && parseResult.intent.action === 'unknown')">
+              <div class="error-message">
+                {{ parseResult.error || '抱歉，我没有理解您的指令。' }}
+              </div>
+              <div class="action-buttons">
+                <van-button type="primary" round block @click="confirmAction">
+                  仍然跳转到新增任务
+                </van-button>
+                <van-button plain round block @click="resetState" style="margin-top: 10px;">
+                  重新输入
+                </van-button>
+              </div>
             </template>
           </div>
 
-          <!-- 手动输入 -->
-          <div class="manual-input">
+          <!-- 手动输入（仅在未解析出结果时显示） -->
+          <div v-if="!parseResult" class="manual-input">
             <van-field
               v-model="manualText"
               type="textarea"
@@ -146,11 +157,12 @@
             </van-button>
           </div>
 
-          <!-- 录音按钮 -->
-          <div class="record-button-area">
+          <!-- 录音按钮（仅在未解析出结果时显示） -->
+          <div v-if="!parseResult" class="record-button-area">
             <VoiceRecorder
               ref="voiceRecorderRef"
               :auto-process="false"
+              :debounce-delay="2000"
               @result="handleVoiceResult"
               @text="handleVoiceText"
               @error="handleVoiceError"
@@ -175,8 +187,8 @@
             </VoiceRecorder>
           </div>
 
-          <!-- 使用提示 -->
-          <div class="usage-tips">
+          <!-- 使用提示（仅在未解析出结果时显示） -->
+          <div v-if="!parseResult" class="usage-tips">
             <div class="tip-title">💡 试试这样说：</div>
             <div class="tip-item">"语文单元形评获得A*，奖励10积分"</div>
             <div class="tip-item">"积分兑换10元"</div>
@@ -221,8 +233,12 @@ const isListening = computed(() => voiceRecorderRef.value?.isListening || false)
 
 // 处理语音识别文本
 let textProcessTimer = null
+let lastTextTime = 0 // 最后一次收到文本的时间
+const VOICE_INPUT_DELAY = 1500 // 用户停止输入1.5秒后再开始AI解析
+
 const handleVoiceText = (text) => {
   recognizedText.value = text
+  lastTextTime = Date.now() // 更新最后文本时间
   
   // 清除之前的定时器
   if (textProcessTimer) {
@@ -230,17 +246,35 @@ const handleVoiceText = (text) => {
     textProcessTimer = null
   }
   
-  // 如果识别已结束，立即处理
-  if (text && text.trim() && !isProcessing.value && !isListening.value) {
-    processVoiceInput(text.trim())
-  } else if (text && text.trim() && !isProcessing.value) {
-    // 如果还在识别中，等待一小段时间（200ms）确保文本稳定后再处理
+  // 如果有文本且不在处理中，设置延迟处理
+  if (text && text.trim() && !isProcessing.value) {
+    // 等待用户停止输入1.5秒后再处理
     textProcessTimer = setTimeout(() => {
-      if (!isProcessing.value && !isListening.value && recognizedText.value === text) {
-        processVoiceInput(text.trim())
+      // 检查：距离最后一次收到文本是否已经过了1.5秒
+      const timeSinceLastText = Date.now() - lastTextTime
+      if (timeSinceLastText >= VOICE_INPUT_DELAY && 
+          !isProcessing.value && 
+          recognizedText.value === text && 
+          text.trim()) {
+        // 如果还在识别中，等待识别结束
+        if (isListening.value) {
+          // 如果还在识别，再等待一小段时间
+          setTimeout(() => {
+            const timeSinceLastText2 = Date.now() - lastTextTime
+            if (timeSinceLastText2 >= VOICE_INPUT_DELAY &&
+                !isProcessing.value && 
+                !isListening.value && 
+                recognizedText.value === text) {
+              processVoiceInput(text.trim())
+            }
+          }, 500)
+        } else {
+          // 识别已结束，且已经过了1.5秒，直接处理
+          processVoiceInput(text.trim())
+        }
       }
       textProcessTimer = null
-    }, 200)
+    }, VOICE_INPUT_DELAY)
   }
 }
 
@@ -272,6 +306,7 @@ const resetState = () => {
     clearTimeout(textProcessTimer)
     textProcessTimer = null
   }
+  lastTextTime = 0
   recognizedText.value = ''
   parseResult.value = null
   manualText.value = ''
@@ -332,31 +367,39 @@ const getActionText = (action) => {
 }
 
 const confirmAction = () => {
-  if (!parseResult.value?.success || !parseResult.value?.intent) return
-
   // 确保停止语音识别
   if (voiceRecorderRef.value && isListening.value) {
     voiceRecorderRef.value.stop()
   }
 
-  const intent = parseResult.value.intent
-  const data = intent.data || {}
-  
   // 获取当前学生ID（从 store 中获取）
   const currentStudentId = studentsStore.currentStudent?.id
 
-  if (intent.action === 'add_task') {
-    // 跳转到任务页面并传递预填数据
+  // 即使解析失败或 action 是 unknown，也允许跳转到新增任务页面
+  const intent = parseResult.value?.intent
+  const data = intent?.data || {}
+  
+  // 构建预填数据，包含所有可用的信息（包括未匹配的名称）
+  const prefillData = {
+    project_level1_id: data.project_level1_id || null,
+    project_level2_id: data.project_level2_id || null,
+    rating: data.rating || null,
+    reward_points: data.reward_points || null,
+    status: data.status || 'completed',
+    reward_type: data.reward_type || (data.reward_points ? 'reward' : 'none'),
+    // 传递未匹配的名称，用于创建新项目
+    project_level1_name: data.project_level1_name || null,
+    project_level2_name: data.project_level2_name || null,
+    punishment_option_name: data.punishment_option_name || null,
+    // 传递警告信息
+    warnings: intent?.warnings || []
+  }
+
+  // 如果是新增任务或未知操作，都跳转到新增任务页面
+  if (!intent || intent.action === 'add_task' || intent.action === 'unknown') {
     const query = {
       action: 'add',
-      prefill: encodeURIComponent(JSON.stringify({
-        project_level1_id: data.project_level1_id,
-        project_level2_id: data.project_level2_id,
-        rating: data.rating,
-        reward_points: data.reward_points,
-        status: 'completed',
-        reward_type: data.reward_points ? 'reward' : 'none'
-      })),
+      prefill: encodeURIComponent(JSON.stringify(prefillData)),
       _t: Date.now()  // 添加时间戳，确保路由变化能被检测到
     }
     
@@ -411,7 +454,22 @@ const confirmAction = () => {
     }
     showPanel.value = false
   } else {
-    showFailToast('无法识别的操作类型')
+    // 其他情况，默认跳转到新增任务页面
+    const query = {
+      action: 'add',
+      prefill: encodeURIComponent(JSON.stringify(prefillData)),
+      _t: Date.now()
+    }
+    
+    if (currentStudentId) {
+      query.student_id = currentStudentId
+    }
+    
+    router.push({
+      path: '/tasks',
+      query
+    })
+    showPanel.value = false
   }
 
   resetState()

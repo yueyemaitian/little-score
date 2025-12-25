@@ -50,13 +50,13 @@
         />
         <van-field
           v-if="isCompletedStatus && form.reward_type === 'reward'"
-          :model-value="rewardPointsDisplayText"
-          readonly
+          v-model.number="form.reward_points"
+          type="number"
           label="奖励积分"
-          placeholder="选择积分"
+          placeholder="输入或选择积分"
           is-link
           required
-          @click="showPointsPicker = true"
+          @click-right-icon="showPointsPicker = true"
         />
         <van-field
           v-if="isCompletedStatus && form.reward_type === 'punish'"
@@ -149,6 +149,112 @@
         @click-option="(params) => handlePickerDoubleClick(params, onPunishmentConfirm)"
       />
     </van-popup>
+
+    <!-- 新增一级项目表单 -->
+    <van-popup v-model:show="showAddProject1Form" position="bottom" :style="{ height: '60%' }">
+      <van-nav-bar
+        title="新增一级项目"
+        left-arrow
+        @click-left="showAddProject1Form = false"
+      />
+      <ProjectForm
+        v-if="showAddProject1Form"
+        :project="null"
+        level="1"
+        :prefilled-name="missingProject1Name"
+        @success="handleProject1Success"
+        @cancel="showAddProject1Form = false"
+      />
+    </van-popup>
+
+    <!-- 新增二级项目表单 -->
+    <van-popup v-model:show="showAddProject2Form" position="bottom" :style="{ height: '60%' }">
+      <van-nav-bar
+        title="新增二级项目"
+        left-arrow
+        @click-left="showAddProject2Form = false"
+      />
+      <ProjectForm
+        v-if="showAddProject2Form"
+        :project="null"
+        level="2"
+        :parent-id="form.project_level1_id"
+        :prefilled-name="missingProject2Name"
+        @success="handleProject2Success"
+        @cancel="showAddProject2Form = false"
+      />
+    </van-popup>
+
+    <!-- 新增惩罚选项表单 -->
+    <van-popup v-model:show="showAddPunishmentForm" position="bottom" :style="{ height: '80%' }">
+      <van-nav-bar
+        title="新增惩罚选项"
+        left-arrow
+        @click-left="showAddPunishmentForm = false"
+      />
+      <PunishmentOptionForm
+        v-if="showAddPunishmentForm"
+        :option="null"
+        :prefilled-name="missingPunishmentOptionName"
+        @success="handlePunishmentSuccess"
+        @cancel="showAddPunishmentForm = false"
+      />
+    </van-popup>
+
+    <!-- 未匹配的一级项目提示对话框 -->
+    <van-dialog
+      v-model:show="showMissingProject1Prompt"
+      title="创建一级项目"
+      :message="`未找到一级项目「${missingProject1Name}」，是否创建？`"
+      show-cancel-button
+      confirm-button-text="创建"
+      cancel-button-text="取消"
+      @confirm="handleCreateMissingProject1"
+      @cancel="missingProject1Name = null"
+    />
+
+    <!-- 未匹配的二级项目提示对话框 -->
+    <van-dialog
+      v-model:show="showMissingProject2Prompt"
+      title="创建二级项目"
+      :message="`未找到二级项目「${missingProject2Name}」，是否创建？`"
+      show-cancel-button
+      confirm-button-text="创建"
+      cancel-button-text="取消"
+      @confirm="handleCreateMissingProject2"
+      @cancel="missingProject2Name = null"
+    />
+
+    <!-- 未匹配的惩罚选项提示对话框 -->
+    <van-dialog
+      v-model:show="showMissingPunishmentOptionPrompt"
+      title="创建惩罚选项"
+      :message="`未找到惩罚选项「${missingPunishmentOptionName}」，是否创建？`"
+      show-cancel-button
+      confirm-button-text="创建"
+      cancel-button-text="取消"
+      @confirm="handleCreateMissingPunishmentOption"
+      @cancel="missingPunishmentOptionName = null"
+    />
+
+    <!-- 自定义分数输入对话框 -->
+    <van-dialog
+      v-model:show="showCustomPointsDialog"
+      title="自定义分数"
+      show-cancel-button
+      confirm-button-text="确定"
+      cancel-button-text="取消"
+      @confirm="handleCustomPointsConfirm"
+      @cancel="customPoints = ''"
+    >
+      <van-field
+        v-model.number="customPoints"
+        type="number"
+        label="积分"
+        placeholder="请输入积分"
+        style="margin: 16px;"
+      />
+    </van-dialog>
   </div>
 </template>
 
@@ -160,6 +266,8 @@ import { projectsApi } from '../api/projects'
 import { scoresApi } from '../api/scores'
 import { useEnumsStore } from '../stores/enums'
 import { extractErrorMessage } from '../utils/errorHandler'
+import ProjectForm from './ProjectForm.vue'
+import PunishmentOptionForm from './PunishmentOptionForm.vue'
 
 const props = defineProps({
   task: {
@@ -200,25 +308,104 @@ const showRatingPicker = ref(false)
 const showRewardTypePicker = ref(false)
 const showPointsPicker = ref(false)
 const showPunishmentPicker = ref(false)
+const showAddProject1Form = ref(false)
+const showAddProject2Form = ref(false)
+const showAddPunishmentForm = ref(false)
+const showCustomPointsDialog = ref(false)
+const customPoints = ref('')
 
 const enumsStore = useEnumsStore()
 
 const project1Columns = computed(() => {
-  return level1Projects.value.map(p => ({ text: p.name, value: p.id }))
+  const base = level1Projects.value.map(p => ({ text: p.name, value: p.id }))
+  return [
+    ...base,
+    {
+      text: '＋ 新增一级项目',
+      value: 'add'
+    }
+  ]
 })
 
 const project2Columns = computed(() => {
-  return level2Projects.value.map(p => ({ text: p.name, value: p.id }))
+  const base = level2Projects.value.map(p => ({ text: p.name, value: p.id }))
+  return [
+    ...base,
+    {
+      text: '＋ 新增二级项目',
+      value: 'add'
+    }
+  ]
 })
 
 // 从 store 获取枚举值
 const statusColumns = computed(() => enumsStore.taskStatus)
 const ratingColumns = computed(() => enumsStore.taskRating)
 const rewardTypeColumns = computed(() => enumsStore.rewardType)
-const pointsColumns = computed(() => enumsStore.rewardPoints)
+const pointsColumns = computed(() => {
+  const base = enumsStore.rewardPoints || []
+  return [
+    ...base,
+    {
+      text: '＋ 自定义分数',
+      value: 'custom'
+    }
+  ]
+})
 
 const punishmentColumns = computed(() => {
-  return punishmentOptions.value.map(p => ({ text: p.name, value: p.id }))
+  const base = punishmentOptions.value.map(p => ({ text: p.name, value: p.id }))
+  return [
+    ...base,
+    {
+      text: '＋ 新增惩罚选项',
+      value: 'add'
+    }
+  ]
+})
+
+// 计算默认索引
+const project1DefaultIndex = computed(() => {
+  if (!form.value.project_level1_id) return 0
+  const index = level1Projects.value.findIndex(p => p.id === form.value.project_level1_id)
+  return index >= 0 ? index : 0
+})
+
+const project2DefaultIndex = computed(() => {
+  if (!form.value.project_level2_id) return 0
+  const index = level2Projects.value.findIndex(p => p.id === form.value.project_level2_id)
+  return index >= 0 ? index : 0
+})
+
+const statusDefaultIndex = computed(() => {
+  if (!form.value.status) return 0
+  const index = enumsStore.taskStatus.findIndex(s => s.value === form.value.status)
+  return index >= 0 ? index : 0
+})
+
+const ratingDefaultIndex = computed(() => {
+  if (!form.value.rating) return 0
+  const index = enumsStore.taskRating.findIndex(r => r.value === form.value.rating)
+  return index >= 0 ? index : 0
+})
+
+const rewardTypeDefaultIndex = computed(() => {
+  if (!form.value.reward_type) return 0
+  const index = enumsStore.rewardType.findIndex(r => r.value === form.value.reward_type)
+  return index >= 0 ? index : 0
+})
+
+const pointsDefaultIndex = computed(() => {
+  if (!form.value.reward_points) return 0
+  const index = enumsStore.rewardPoints.findIndex(p => p.value === form.value.reward_points)
+  // 如果是自定义分数，默认选中"自定义分数"选项（最后一个）
+  return index >= 0 ? index : (pointsColumns.value.length - 1)
+})
+
+const punishmentDefaultIndex = computed(() => {
+  if (!form.value.punishment_option_id) return 0
+  const index = punishmentOptions.value.findIndex(p => p.id === form.value.punishment_option_id)
+  return index >= 0 ? index : 0
 })
 
 // Picker 双击确认支持
@@ -268,7 +455,7 @@ const rewardTypeDisplayText = computed(() => {
 const rewardPointsDisplayText = computed(() => {
   if (!form.value.reward_points) return ''
   const option = enumsStore.rewardPoints.find(p => p.value === form.value.reward_points)
-  return option ? option.text : ''
+  return option ? option.text : `${form.value.reward_points}积分`
 })
 
 const punishmentDisplayText = computed(() => {
@@ -308,7 +495,14 @@ const fetchPunishmentOptions = async () => {
 }
 
 const onProject1Confirm = async ({ selectedOptions }) => {
-  const projectId = selectedOptions[0].value
+  const option = selectedOptions[0]
+  if (option.value === 'add') {
+    showProject1Picker.value = false
+    showAddProject1Form.value = true
+    return
+  }
+  
+  const projectId = option.value
   form.value.project_level1_id = projectId
   
   // 获取二级项目
@@ -323,7 +517,20 @@ const onProject1Confirm = async ({ selectedOptions }) => {
 }
 
 const onProject2Confirm = ({ selectedOptions }) => {
-  form.value.project_level2_id = selectedOptions[0].value
+  const option = selectedOptions[0]
+  if (option.value === 'add') {
+    // 如果还没有选择一级项目，提示用户先选择
+    if (!form.value.project_level1_id) {
+      showFailToast('请先选择一级项目')
+      showProject2Picker.value = false
+      return
+    }
+    showProject2Picker.value = false
+    showAddProject2Form.value = true
+    return
+  }
+  
+  form.value.project_level2_id = option.value
   showProject2Picker.value = false
 }
 
@@ -359,13 +566,108 @@ const onRewardTypeConfirm = ({ selectedOptions }) => {
 }
 
 const onPointsConfirm = ({ selectedOptions }) => {
-  form.value.reward_points = selectedOptions[0].value
-  showPointsPicker.value = false
+  const option = selectedOptions[0]
+  if (option.value === 'custom') {
+    // 打开自定义分数输入框
+    showPointsPicker.value = false
+    showCustomPointsDialog.value = true
+  } else {
+    form.value.reward_points = option.value
+    showPointsPicker.value = false
+  }
 }
 
 const onPunishmentConfirm = ({ selectedOptions }) => {
-  form.value.punishment_option_id = selectedOptions[0].value
+  const option = selectedOptions[0]
+  if (option.value === 'add') {
+    showPunishmentPicker.value = false
+    showAddPunishmentForm.value = true
+    return
+  }
+  
+  form.value.punishment_option_id = option.value
   showPunishmentPicker.value = false
+}
+
+// 处理新增一级项目成功
+const handleProject1Success = async () => {
+  showAddProject1Form.value = false
+  const createdProjectName = missingProject1Name.value
+  missingProject1Name.value = null
+  // 刷新一级项目列表
+  await fetchProjects()
+  // 自动选择刚创建的一级项目
+  if (createdProjectName) {
+    const newProject = level1Projects.value.find(p => p.name === createdProjectName)
+    if (newProject) {
+      form.value.project_level1_id = newProject.id
+      // 加载二级项目
+      const projects = await projectsApi.getList({ level: 2, parent_id: newProject.id })
+      level2Projects.value = projects
+      // 如果之前有未匹配的二级项目名称，现在一级项目已创建，可以创建二级项目了
+      if (missingProject2Name.value) {
+        showMissingProject2Prompt.value = true
+        return
+      }
+    }
+  }
+  // 重新打开选择器
+  showProject1Picker.value = true
+}
+
+// 处理新增二级项目成功
+const handleProject2Success = async () => {
+  showAddProject2Form.value = false
+  const createdProjectName = missingProject2Name.value
+  missingProject2Name.value = null
+  // 刷新二级项目列表
+  if (form.value.project_level1_id) {
+    try {
+      const projects = await projectsApi.getList({ level: 2, parent_id: form.value.project_level1_id })
+      level2Projects.value = projects
+      // 自动选择刚创建的二级项目
+      if (createdProjectName) {
+        const newProject = projects.find(p => p.name === createdProjectName)
+        if (newProject) {
+          form.value.project_level2_id = newProject.id
+        }
+      }
+    } catch (error) {
+      level2Projects.value = []
+    }
+  }
+  // 重新打开选择器
+  showProject2Picker.value = true
+}
+
+// 处理新增惩罚选项成功
+const handlePunishmentSuccess = async () => {
+  showAddPunishmentForm.value = false
+  const createdOptionName = missingPunishmentOptionName.value
+  missingPunishmentOptionName.value = null
+  // 刷新惩罚选项列表
+  await fetchPunishmentOptions()
+  // 自动选择刚创建的惩罚选项
+  if (createdOptionName) {
+    const newOption = punishmentOptions.value.find(p => p.name === createdOptionName)
+    if (newOption) {
+      form.value.punishment_option_id = newOption.id
+    }
+  }
+  // 重新打开选择器
+  showPunishmentPicker.value = true
+}
+
+// 处理自定义分数确认
+const handleCustomPointsConfirm = () => {
+  const points = parseInt(customPoints.value)
+  if (isNaN(points) || points <= 0) {
+    showFailToast('请输入有效的积分（大于0的整数）')
+    return
+  }
+  form.value.reward_points = points
+  customPoints.value = ''
+  showCustomPointsDialog.value = false
 }
 
 const onSubmit = async () => {
@@ -446,6 +748,8 @@ watch(() => form.value.project_level1_id, async (newVal) => {
 })
 
 onMounted(async () => {
+  // 确保枚举值已加载
+  await enumsStore.fetchEnums()
   await fetchProjects()
   await fetchPunishmentOptions()
   
@@ -472,6 +776,9 @@ onMounted(async () => {
     // 设置状态（通常是已完成）
     if (prefillData.status) {
       form.value.status = prefillData.status
+    } else if (prefillData.rating) {
+      // 如果有评分但没有状态，默认设置为已完成（因为评分通常意味着任务已完成）
+      form.value.status = 'completed'
     }
     
     // 设置一级项目
@@ -484,12 +791,28 @@ onMounted(async () => {
       // 设置二级项目
       if (prefillData.project_level2_id) {
         form.value.project_level2_id = prefillData.project_level2_id
+      } else if (prefillData.project_level2_name) {
+        // 如果二级项目名称存在但没有ID，提示用户创建
+        missingProject2Name.value = prefillData.project_level2_name
+        showMissingProject2Prompt.value = true
+      }
+    } else if (prefillData.project_level1_name) {
+      // 如果有一级项目名称但没有ID，提示用户创建
+      missingProject1Name.value = prefillData.project_level1_name
+      showMissingProject1Prompt.value = true
+      // 如果同时有二级项目名称，保存起来，等一级项目创建后再处理
+      if (prefillData.project_level2_name) {
+        missingProject2Name.value = prefillData.project_level2_name
       }
     }
     
-    // 设置评分
+    // 设置评分（必须在设置status之后，因为评分字段的显示依赖于status）
     if (prefillData.rating) {
       form.value.rating = prefillData.rating
+      // 如果有评分，确保状态是已完成（这样评分字段才会显示）
+      if (!form.value.status || form.value.status !== 'completed') {
+        form.value.status = 'completed'
+      }
     }
     
     // 设置奖励类型和积分
@@ -499,8 +822,39 @@ onMounted(async () => {
     if (prefillData.reward_points) {
       form.value.reward_points = prefillData.reward_points
     }
+    
+    // 设置惩罚选项
+    if (prefillData.punishment_option_id) {
+      form.value.punishment_option_id = prefillData.punishment_option_id
+    } else if (prefillData.punishment_option_name) {
+      // 如果有惩罚选项名称但没有ID，提示用户创建
+      missingPunishmentOptionName.value = prefillData.punishment_option_name
+      showMissingPunishmentOptionPrompt.value = true
+    }
   }
 })
+
+// 处理创建未匹配的一级项目
+const handleCreateMissingProject1 = () => {
+  showMissingProject1Prompt.value = false
+  showAddProject1Form.value = true
+}
+
+// 处理创建未匹配的二级项目
+const handleCreateMissingProject2 = () => {
+  showMissingProject2Prompt.value = false
+  if (!form.value.project_level1_id) {
+    showFailToast('请先选择一级项目')
+    return
+  }
+  showAddProject2Form.value = true
+}
+
+// 处理创建未匹配的惩罚选项
+const handleCreateMissingPunishmentOption = () => {
+  showMissingPunishmentOptionPrompt.value = false
+  showAddPunishmentForm.value = true
+}
 </script>
 
 <style scoped>

@@ -23,10 +23,11 @@
           :model-value="parentDisplayText"
           readonly
           label="父项目"
-          placeholder="选择一级项目"
+          :placeholder="parentId ? '已自动选择' : '选择一级项目'"
           is-link
-          required
-          @click="showParentPicker = true"
+          :required="!parentId"
+          :disabled="!!parentId"
+          @click="!parentId && (showParentPicker = true)"
         />
       </van-cell-group>
       <div style="margin: 16px;">
@@ -53,7 +54,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { showSuccessToast, showFailToast } from 'vant'
 import { projectsApi } from '../api/projects'
 import { extractErrorMessage } from '../utils/errorHandler'
@@ -66,6 +67,10 @@ const props = defineProps({
   level: {
     type: String,
     required: true
+  },
+  parentId: {
+    type: Number,
+    default: null
   }
 })
 
@@ -207,11 +212,38 @@ onMounted(async () => {
   }
   
   if (props.project) {
+    // 编辑模式：使用项目数据
     form.value = {
       name: props.project.name,
       description: props.project.description || '',
       parent_id: props.project.parent_id
     }
+  } else {
+    // 新增模式
+    if (props.level === '2' && props.parentId) {
+      // 如果是新增二级项目且传入了 parentId，在加载完一级项目列表后设置
+      // 此时一级项目列表已经加载完成，可以正确显示
+      form.value.parent_id = props.parentId
+    }
+  }
+})
+
+// 监听 parentId 变化，如果是从外部传入的，自动设置
+watch(() => props.parentId, async (newVal) => {
+  if (props.level === '2' && newVal && !props.project) {
+    // 确保一级项目列表已加载
+    if (level1Projects.value.length === 0) {
+      await fetchLevel1Projects()
+    }
+    form.value.parent_id = newVal
+  }
+})
+
+// 监听 showParentPicker，当打开选择器时，如果已经有 parentId，确保显示正确
+watch(() => showParentPicker.value, (isOpen) => {
+  if (isOpen && props.level === '2' && form.value.parent_id) {
+    // 选择器打开时，如果已经有 parent_id，确保一级项目列表已加载
+    // 这样默认索引才能正确计算
   }
 })
 </script>

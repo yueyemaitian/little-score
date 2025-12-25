@@ -294,10 +294,16 @@ const onStudentConfirm = ({ selectedOptions }) => {
   showStudentPicker.value = false
 }
 
-// 首页快捷入口：记一笔 -> 跳转任务页
+// 首页快捷入口：记一笔 -> 跳转任务页并打开新增表单
 const handleQuickAddTask = (studentId) => {
   studentsStore.setCurrentStudent(studentId)
-  router.push({ path: '/tasks' })
+  router.push({
+    path: '/tasks',
+    query: {
+      action: 'add',
+      student_id: studentId
+    }
+  })
 }
 
 // 切换学生

@@ -651,7 +651,7 @@ const handleAddTask = () => {
 
 // 处理预填数据和打开表单的函数
 const handlePrefillData = async () => {
-  // 处理 URL 参数中的 student_id（从语音助手跳转过来）
+  // 处理 URL 参数中的 student_id（从语音助手或首页跳转过来）
   if (route.query.student_id) {
     const studentId = parseInt(route.query.student_id)
     const student = studentsStore.students.find(s => s.id === studentId)
@@ -661,32 +661,45 @@ const handlePrefillData = async () => {
     }
   }
   
-  // 检查是否有预填数据（从语音助手跳转）
-  if (route.query.action === 'add' && route.query.prefill) {
-    try {
-      prefillData.value = JSON.parse(decodeURIComponent(route.query.prefill))
-      // 确保已选择学生后再打开表单
+  // 检查是否有 action=add 参数
+  if (route.query.action === 'add') {
+    // 如果有预填数据（从语音助手跳转）
+    if (route.query.prefill) {
+      try {
+        prefillData.value = JSON.parse(decodeURIComponent(route.query.prefill))
+        // 确保已选择学生后再打开表单
+        if (currentStudentId.value) {
+          showTaskForm.value = true
+          showToast({
+            message: '已从语音助手预填表单，请确认信息',
+            position: 'top',
+            duration: 3000
+          })
+        } else {
+          showFailToast('请先选择学生')
+        }
+        // 清除 URL 参数，避免刷新页面重复打开
+        router.replace({ path: '/tasks' })
+      } catch (e) {
+        console.error('解析预填数据失败:', e)
+      }
+    } else {
+      // 没有预填数据，直接打开新增表单（从首页"记一笔"跳转）
       if (currentStudentId.value) {
+        editingTask.value = null
         showTaskForm.value = true
-        showToast({
-          message: '已从语音助手预填表单，请确认信息',
-          position: 'top',
-          duration: 3000
-        })
+        // 清除 URL 参数，避免刷新页面重复打开
+        router.replace({ path: '/tasks' })
       } else {
         showFailToast('请先选择学生')
       }
-      // 清除 URL 参数，避免刷新页面重复打开
-      router.replace({ path: '/tasks' })
-    } catch (e) {
-      console.error('解析预填数据失败:', e)
     }
   }
 }
 
 // 监听路由变化，处理预填数据（当用户在任务页面时，路由参数变化也能响应）
 watch(() => route.query, async (newQuery) => {
-  if (newQuery.action === 'add' && newQuery.prefill) {
+  if (newQuery.action === 'add') {
     await handlePrefillData()
   }
 }, { deep: true })
@@ -700,6 +713,9 @@ onMounted(async () => {
     currentStudentId.value = studentsStore.currentStudent.id
     }
   }
+  
+  // 处理 URL 参数（从首页或语音助手跳转）
+  await handlePrefillData()
   
   // 不设置默认的 completed_after，让 fetchTasks 使用默认逻辑
   // （显示最近一个月完成的任务 + 未开始和进行中的任务）

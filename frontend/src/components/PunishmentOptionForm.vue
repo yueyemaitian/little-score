@@ -74,6 +74,39 @@
         @click-option="(params) => handlePickerDoubleClick(params, onProject2Confirm)"
       />
     </van-popup>
+
+    <!-- 新增一级项目表单 -->
+    <van-popup v-model:show="showAddProject1Form" position="bottom" :style="{ height: '60%' }">
+      <van-nav-bar
+        title="新增一级项目"
+        left-arrow
+        @click-left="showAddProject1Form = false"
+      />
+      <ProjectForm
+        v-if="showAddProject1Form"
+        :project="null"
+        level="1"
+        @success="handleProject1Success"
+        @cancel="showAddProject1Form = false"
+      />
+    </van-popup>
+
+    <!-- 新增二级项目表单 -->
+    <van-popup v-model:show="showAddProject2Form" position="bottom" :style="{ height: '60%' }">
+      <van-nav-bar
+        title="新增二级项目"
+        left-arrow
+        @click-left="showAddProject2Form = false"
+      />
+      <ProjectForm
+        v-if="showAddProject2Form"
+        :project="null"
+        level="2"
+        :parent-id="form.related_project_level1_id"
+        @success="handleProject2Success"
+        @cancel="showAddProject2Form = false"
+      />
+    </van-popup>
   </div>
 </template>
 
@@ -106,13 +139,29 @@ const level1Projects = ref([])
 const level2Projects = ref([])
 const showProject1Picker = ref(false)
 const showProject2Picker = ref(false)
+const showAddProject1Form = ref(false)
+const showAddProject2Form = ref(false)
 
 const project1Columns = computed(() => {
-  return level1Projects.value.map(p => ({ text: p.name, value: p.id }))
+  const base = level1Projects.value.map(p => ({ text: p.name, value: p.id }))
+  return [
+    ...base,
+    {
+      text: '＋ 新增一级项目',
+      value: 'add'
+    }
+  ]
 })
 
 const project2Columns = computed(() => {
-  return level2Projects.value.map(p => ({ text: p.name, value: p.id }))
+  const base = level2Projects.value.map(p => ({ text: p.name, value: p.id }))
+  return [
+    ...base,
+    {
+      text: '＋ 新增二级项目',
+      value: 'add'
+    }
+  ]
 })
 
 const project1DisplayText = computed(() => {
@@ -166,7 +215,14 @@ const fetchProjects = async () => {
 }
 
 const onProject1Confirm = async ({ selectedOptions }) => {
-  const projectId = selectedOptions[0].value
+  const option = selectedOptions[0]
+  if (option.value === 'add') {
+    showProject1Picker.value = false
+    showAddProject1Form.value = true
+    return
+  }
+  
+  const projectId = option.value
   form.value.related_project_level1_id = projectId
   form.value.related_project_level2_id = null // 清空二级项目
   
@@ -182,8 +238,40 @@ const onProject1Confirm = async ({ selectedOptions }) => {
 }
 
 const onProject2Confirm = ({ selectedOptions }) => {
-  form.value.related_project_level2_id = selectedOptions[0].value
+  const option = selectedOptions[0]
+  if (option.value === 'add') {
+    showProject2Picker.value = false
+    showAddProject2Form.value = true
+    return
+  }
+  
+  form.value.related_project_level2_id = option.value
   showProject2Picker.value = false
+}
+
+// 处理新增一级项目成功
+const handleProject1Success = async () => {
+  showAddProject1Form.value = false
+  // 刷新一级项目列表
+  await fetchProjects()
+  // 重新打开选择器
+  showProject1Picker.value = true
+}
+
+// 处理新增二级项目成功
+const handleProject2Success = async () => {
+  showAddProject2Form.value = false
+  // 刷新二级项目列表
+  if (form.value.related_project_level1_id) {
+    try {
+      const projects = await projectsApi.getList({ level: 2, parent_id: form.value.related_project_level1_id })
+      level2Projects.value = projects
+    } catch (error) {
+      level2Projects.value = []
+    }
+  }
+  // 重新打开选择器
+  showProject2Picker.value = true
 }
 
 const onSubmit = async () => {

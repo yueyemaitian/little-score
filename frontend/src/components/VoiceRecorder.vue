@@ -149,29 +149,18 @@ onMounted(() => {
         autoStopTimer = null
       }
 
-      // 如果有最终结果，立即处理（不需要等待防抖）
-      if (finalTranscript) {
-        const textToProcess = accumulatedText.trim()
-        if (textToProcess) {
-          // 停止识别
-          if (recognition && isListening.value) {
-            try {
-              recognition.stop()
-            } catch (err) {
-              console.warn('停止识别失败:', err)
-            }
-          }
-          if (props.autoProcess) {
-            handleResult(textToProcess)
-          } else {
-            // 不自动处理时，发送最终文本
-            emit('text', textToProcess)
-          }
+      // 如果有最终结果，不立即停止识别，继续监听（让用户可能继续说话）
+      // 只有在长时间没有新结果时才停止识别
+      if (finalTranscript || interimTranscript) {
+        // 清除之前的自动停止定时器
+        if (autoStopTimer) {
+          clearTimeout(autoStopTimer)
+          autoStopTimer = null
         }
-      } else if (interimTranscript) {
-        // 只有临时结果时，设置1秒自动停止定时器
+        
+        // 设置自动停止定时器，等待用户停止输入
         autoStopTimer = setTimeout(() => {
-          // 检查是否在1秒内没有新的结果
+          // 检查是否在debounceDelay时间内没有新的结果
           const timeSinceLastResult = Date.now() - lastResultTime
           if (timeSinceLastResult >= props.debounceDelay && isListening.value) {
             // 停止识别
@@ -183,7 +172,7 @@ onMounted(() => {
               }
             }
             // 处理累积的文本
-            const textToProcess = (accumulatedText + interimTranscript).trim()
+            const textToProcess = accumulatedText.trim()
             if (textToProcess) {
               if (props.autoProcess) {
                 handleResult(textToProcess)

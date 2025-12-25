@@ -65,19 +65,26 @@ SYSTEM_PROMPT = """你是一个积分管理系统的智能助手，负责解析�
     "status": "任务状态（可选，默认为'completed'）",
     "rating": "评分等级",
     "reward_type": "惩奖类型（'none'、'reward'、'punish'）",
-    "reward_points": 数字（奖励积分，当reward_type为'reward'时）,
+    "reward_points": 数字（奖励积分，当reward_type为'reward'时，**必须使用用户实际说的数值，不要强制匹配到预设值**）,
     "punishment_option_name": "惩罚选项名称（当reward_type为'punish'时）",
     
     // 对于 exchange_points:
     "reward_name": "奖励名称或描述"
   },
-  "message": "给用户的友好提示"
+  "message": "给用户的友好提示（如果生成message，对于add_task，应使用'将为您记录'而不是'已为您记录'，因为任务还未真正创建）"
 }
 
 注意：
 - **重要：下方会提供用户系统中所有可用的选项列表（包括固定的枚举值和用户自定义的选项）**
-- **请优先将语音识别的文本匹配到这些选项，即使识别有错误也要智能纠错**
-- 例如用户自定义了"单元形评"，语音识别为"单元行苹"，你应该识别为"单元形评"
+- **项目匹配原则：**
+  - **优先匹配语义相近的项目**：如果语音识别有错误但含义相近，可以智能纠错。例如用户自定义了"单元形评"，语音识别为"单元行苹"，应该识别为"单元形评"
+  - **不要强行匹配含义相差较远的项目**：如果用户说的项目与现有项目含义相差较远（例如"国际象棋比赛"与"挑战新领域"的"绝地反击"），**不要强行匹配**，应该保留用户原始说的项目名称，让系统提示用户新增项目
+  - **匹配标准**：只有当项目名称在语义上真正相关或相似时，才进行匹配。如果只是语音识别错误但含义相同，可以纠错；如果含义完全不同，必须保留原始名称
+- **对于奖励积分（reward_points）：必须使用用户实际说的数值，不要强制匹配到预设值！**
+  - 如果用户说"奖励15分"，即使15不在预设列表中，也要返回 reward_points: 15
+  - 如果用户说"奖励10分"，返回 reward_points: 10
+  - 不要因为预设值中有10，就把用户说的15改成10
+- **对于message字段：如果生成提示信息，对于add_task操作，必须使用"将为您记录"而不是"已为您记录"，因为任务还未真正创建，只是准备创建**
 - 如果完全无法理解，返回 action: "unknown"
 - 只返回 JSON，不要有其他内容"""
 
@@ -146,8 +153,9 @@ async def _build_user_context(db: AsyncSession, user_id: int) -> str:
     reward_points_options = [1, 3, 5, 7, 10]  # 这些值在 enums.py 中定义
     if reward_points_options:
         points_labels = [f"{p}积分" for p in reward_points_options]
-        context_parts.append("\n【奖励积分（固定选项）】")
+        context_parts.append("\n【奖励积分（固定选项，仅供参考，必须使用用户实际说的数值）】")
         context_parts.append(f"  {', '.join(points_labels)}")
+        context_parts.append("  **重要：如果用户说的积分值不在上述列表中，也必须使用用户实际说的数值，不要强制匹配！例如用户说'奖励15分'，即使15不在列表中，也要返回 reward_points: 15**")
     
     # ========== 3. 获取用户自定义的惩罚选项 ==========
     punishment_options = await crud_score.get_punishment_options(db, user_id=user_id)
@@ -270,44 +278,73 @@ async def _validate_task_data(
     # 获取所有一级项目
     level1_projects = await crud_project.get_projects_by_user(db, user_id=user_id, level=1)
     
-    # 匹配一级项目
+    # 匹配一级项目（使用更严格的匹配策略，避免强行匹配含义相差较远的项目）
     project_level1_name = data.get("project_level1_name", "")
     matched_level1 = None
-    for p in level1_projects:
-        if project_level1_name and (
-            project_level1_name.lower() in p.name.lower() or 
-            p.name.lower() in project_level1_name.lower()
-        ):
-            matched_level1 = p
-            break
+    
+    if project_level1_name:
+        # 首先尝试精确匹配或高度相似匹配
+        project_lower = project_level1_name.lower().strip()
+        for p in level1_projects:
+            p_name_lower = p.name.lower().strip()
+            # 精确匹配
+            if project_lower == p_name_lower:
+                matched_level1 = p
+                break
+            # 如果用户说的名称包含在项目名称中，且长度相近（避免"国际象棋"匹配到"象棋"这种短词）
+            if len(project_lower) >= 3 and project_lower in p_name_lower:
+                # 检查是否真的是相关项目（避免强行匹配）
+                # 如果项目名称明显更长，可能是包含关系，需要更严格判断
+                if len(p_name_lower) - len(project_lower) <= 5:  # 允许一定的长度差异
+                    matched_level1 = p
+                    break
+            # 如果项目名称包含在用户说的名称中
+            if len(p_name_lower) >= 3 and p_name_lower in project_lower:
+                matched_level1 = p
+                break
     
     if matched_level1:
         data["project_level1_id"] = matched_level1.id
         data["project_level1_name_matched"] = matched_level1.name
     else:
-        warnings.append(f"未找到匹配的一级项目「{project_level1_name}」，请手动选择")
+        # 如果AI已经解析出项目名称但没有匹配到，保留原始名称，提示用户新增
+        if project_level1_name:
+            warnings.append(f"未找到匹配的一级项目「{project_level1_name}」，将提示您新增该项目")
         data["project_level1_id"] = None
     
-    # 匹配二级项目
+    # 匹配二级项目（使用更严格的匹配策略）
     if matched_level1 and data.get("project_level2_name"):
         level2_projects = await crud_project.get_projects_by_user(
             db, user_id=user_id, level=2, parent_id=matched_level1.id
         )
         project_level2_name = data.get("project_level2_name", "")
         matched_level2 = None
-        for p in level2_projects:
-            if project_level2_name and (
-                project_level2_name.lower() in p.name.lower() or
-                p.name.lower() in project_level2_name.lower()
-            ):
-                matched_level2 = p
-                break
+        
+        if project_level2_name:
+            project_lower = project_level2_name.lower().strip()
+            for p in level2_projects:
+                p_name_lower = p.name.lower().strip()
+                # 精确匹配
+                if project_lower == p_name_lower:
+                    matched_level2 = p
+                    break
+                # 如果用户说的名称包含在项目名称中，且长度相近
+                if len(project_lower) >= 3 and project_lower in p_name_lower:
+                    if len(p_name_lower) - len(project_lower) <= 5:
+                        matched_level2 = p
+                        break
+                # 如果项目名称包含在用户说的名称中
+                if len(p_name_lower) >= 3 and p_name_lower in project_lower:
+                    matched_level2 = p
+                    break
         
         if matched_level2:
             data["project_level2_id"] = matched_level2.id
             data["project_level2_name_matched"] = matched_level2.name
         else:
-            warnings.append(f"未找到匹配的二级项目「{project_level2_name}」，请手动选择")
+            # 如果AI已经解析出项目名称但没有匹配到，保留原始名称，提示用户新增
+            if project_level2_name:
+                warnings.append(f"未找到匹配的二级项目「{project_level2_name}」，将提示您新增该项目")
             data["project_level2_id"] = None
     else:
         data["project_level2_id"] = None
@@ -340,6 +377,56 @@ async def _validate_task_data(
         data["rating"] = rating
     else:
         data["rating"] = None
+    
+    # 验证奖励积分（不强制匹配，只提示是否匹配预设值）
+    reward_points = data.get("reward_points")
+    if reward_points is not None:
+        try:
+            reward_points = int(reward_points)
+            # 预设的积分选项（从枚举中获取）
+            valid_reward_points = [1, 3, 5, 7, 10]  # 这些值在 enums.py 中定义
+            if reward_points not in valid_reward_points:
+                # 不在预设列表中，只提示，不强制修改
+                warnings.append(f"积分值「{reward_points}」不在预设列表中（预设值：{', '.join(map(str, valid_reward_points))}），将使用您录入的分数")
+            # 保留原始值，不强制修改
+            data["reward_points"] = reward_points
+        except (ValueError, TypeError):
+            # 如果无法转换为整数，添加警告但不强制修改
+            warnings.append(f"积分值「{data.get('reward_points')}」可能不正确，请确认")
+            # 保留原始值，让前端处理
+            data["reward_points"] = data.get("reward_points")
+    
+    # 验证惩罚选项（匹配系统中的惩罚选项）
+    punishment_option_name = data.get("punishment_option_name", "")
+    if punishment_option_name:
+        # 获取所有惩罚选项
+        from app.crud import score as crud_score
+        punishment_options = await crud_score.get_punishment_options(db, user_id=user_id)
+        
+        matched_punishment = None
+        if punishment_options:
+            punishment_lower = punishment_option_name.lower().strip()
+            for option in punishment_options:
+                option_name_lower = option.name.lower().strip()
+                # 精确匹配
+                if punishment_lower == option_name_lower:
+                    matched_punishment = option
+                    break
+                # 模糊匹配（包含关系）
+                if len(punishment_lower) >= 2 and (
+                    punishment_lower in option_name_lower or 
+                    option_name_lower in punishment_lower
+                ):
+                    matched_punishment = option
+                    break
+        
+        if matched_punishment:
+            data["punishment_option_id"] = matched_punishment.id
+            data["punishment_option_name_matched"] = matched_punishment.name
+        else:
+            # 如果AI已经解析出惩罚选项名称但没有匹配到，保留原始名称，提示用户新增
+            warnings.append(f"未找到匹配的惩罚选项「{punishment_option_name}」，将提示您新增该选项")
+            data["punishment_option_id"] = None
     
     intent.data = data
     intent.warnings = warnings
